@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+
+# Local binaries
+netmon
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs
+*.md
+
+# Test files
+*_test.go
+.github

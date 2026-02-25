@@ -59,6 +59,20 @@ sudo ./netmon -verbose
 sudo ./netmon -interval 5s  # Add filtering by PID if needed
 ```
 
+### Docker Usage
+
+```bash
+# Using Docker Compose (easiest)
+docker-compose up -d
+docker-compose logs -f
+
+# Or build and run manually
+docker build -t netmon .
+docker run --rm --network host netmon -interval 5s -alerts-only
+```
+
+NetMon uses `--network host` mode to monitor the host's network connections from inside the container.
+
 ### Command-line Options
 
 - `-interval`: Monitoring interval (default: 5s)

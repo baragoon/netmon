@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  netmon:
+    build: .
+    container_name: netmon
+    # Use host network to monitor host connections
+    network_mode: "host"
+    # Run as root to access network data
+    user: "root"
+    # Optional: use privileged mode for maximum capabilities
+    # privileged: true
+    # Optional: mount config file
+    # volumes:
+    #   - ./config.json:/app/config.json:ro
+    # Set environment variables if needed
+    environment:
+      - TZ=UTC
+    # Keep container running
+    restart: unless-stopped
+    # Recommendations based on your monitoring needs:
+    # - Change interval: Modify the CMD defaults below
+    # - Add verbosity: Add "-verbose" flag below
+    # - Use custom config: Uncomment volumes and add "-config /app/config.json"
+    command: ["-interval", "5s", "-alerts-only"]
