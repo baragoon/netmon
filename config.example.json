@@ -1,0 +1,51 @@
+{
+  "interval": "5s",
+  "standard_ports": [
+    80,
+    443,
+    53
+  ],
+  "anomalous_patterns": [
+    "ssh",
+    "telnet"
+  ],
+  "watch_processes": [],
+  "verbose": false,
+  "alerts_only": true,
+  "pid": 0,
+  "notifications": {
+    "enabled": true,
+    "title_template": "🚨 Suspicious Connection Detected",
+    "message_template": "Service: {service}\nRemote IP: {ip}:{port}\nProtocol: {protocol}\nReason: {reason}",
+    "pushover": {
+      "enabled": false,
+      "api_key": "your_pushover_api_key",
+      "user_key": "your_pushover_user_key",
+      "device": "",
+      "sound": "incoming"
+    },
+    "ntfy": {
+      "enabled": false,
+      "topic": "netmon-alerts",
+      "base_url": "https://ntfy.sh",
+      "title": "🚨 NetMon Alert"
+    },
+    "pushbullet": {
+      "enabled": false,
+      "api_key": "your_pushbullet_api_key"
+    },
+    "telegram": {
+      "enabled": false,
+      "bot_token": "your_telegram_bot_token",
+      "chat_id": "your_chat_id"
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "https://example.com/webhook",
+      "method": "POST",
+      "headers": {
+        "Authorization": "Bearer your_token"
+      }
+    }
+  }
+}
