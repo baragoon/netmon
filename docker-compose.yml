@@ -15,7 +15,7 @@ services:
     #   - ./config.json:/app/config.json:ro
     # Set environment variables if needed
     environment:
-      - TZ=UTC
+      - TZ=Europe/Kyiv
     # Keep container running
     restart: unless-stopped
     # Recommendations based on your monitoring needs:
