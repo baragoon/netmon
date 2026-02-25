@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -17,11 +18,26 @@ func main() {
 	verbose := flag.Bool("verbose", false, "Enable verbose output")
 	alertOnly := flag.Bool("alerts-only", false, "Only show alerts for abnormal activity")
 	configPath := flag.String("config", "", "Path to configuration file")
+	logPath := flag.String("log", "", "Optional path to log file (logs to stdout if not specified)")
 
 	flag.Parse()
 
-	// Initialize logger
-	logger := log.New(os.Stdout, "[netmon] ", log.LstdFlags|log.Lshortfile)
+	// Initialize logger with optional file output
+	var logWriter io.Writer = os.Stdout
+	var logFile *os.File
+	var err error
+
+	if *logPath != "" {
+		logFile, err = os.OpenFile(*logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatalf("Failed to open log file: %v", err)
+		}
+		defer logFile.Close()
+		// Write to both stdout and file
+		logWriter = io.MultiWriter(os.Stdout, logFile)
+	}
+
+	logger := log.New(logWriter, "[netmon] ", log.LstdFlags|log.Lshortfile)
 
 	// Load configuration
 	config := monitor.DefaultConfig()

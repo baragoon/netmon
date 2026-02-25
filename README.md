@@ -55,6 +55,9 @@ sudo ./netmon -alerts-only
 # Enable verbose output
 sudo ./netmon -verbose
 
+# Log to file (outputs to both stdout and file)
+sudo ./netmon -log /var/log/netmon.log
+
 # Monitor specific process (by PID)
 sudo ./netmon -interval 5s  # Add filtering by PID if needed
 ```
@@ -79,6 +82,7 @@ NetMon uses `--network host` mode to monitor the host's network connections from
 - `-verbose`: Show all connections, not just anomalies
 - `-alerts-only`: Only show flagged suspicious connections
 - `-config`: Path to JSON configuration file
+- `-log`: Optional path to log file (logs to stdout if not specified)
 
 ### Configuration File
 
