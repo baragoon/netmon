@@ -79,3 +79,9 @@ func (c *Connection) DetailedString() string {
 	}
 	return result
 }
+
+// remoteAddressKey creates a unique key based on remote IP and port only
+// Used for deduplicating notifications to avoid spam from the same address
+func (c *Connection) remoteAddressKey() string {
+	return fmt.Sprintf("%s:%d", c.RemoteIP, c.RemotePort)
+}

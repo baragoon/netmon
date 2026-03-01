@@ -11,14 +11,16 @@ import (
 
 // NotificationConfig holds the configuration for all notification providers
 type NotificationConfig struct {
-	Enabled    bool                   `json:"enabled"`
-	Pushover   *PushoverConfig        `json:"pushover,omitempty"`
-	Ntfy       *NtfyConfig            `json:"ntfy,omitempty"`
-	Pushbullet *PushbulletConfig      `json:"pushbullet,omitempty"`
-	Telegram   *TelegramConfig        `json:"telegram,omitempty"`
-	Webhook    *WebhookConfig         `json:"webhook,omitempty"`
-	TitleTemplate string              `json:"title_template"`
-	MessageTemplate string            `json:"message_template"`
+	Enabled             bool                   `json:"enabled"`
+	NotificationCooldown time.Duration         `json:"-"` // Internal field, set from NotificationCooldownStr
+	NotificationCooldownStr string             `json:"notification_cooldown"` // JSON field e.g. "1h", "24h"
+	Pushover            *PushoverConfig        `json:"pushover,omitempty"`
+	Ntfy                *NtfyConfig            `json:"ntfy,omitempty"`
+	Pushbullet          *PushbulletConfig      `json:"pushbullet,omitempty"`
+	Telegram            *TelegramConfig        `json:"telegram,omitempty"`
+	Webhook             *WebhookConfig         `json:"webhook,omitempty"`
+	TitleTemplate       string                 `json:"title_template"`
+	MessageTemplate     string                 `json:"message_template"`
 }
 
 // PushoverConfig holds Pushover API configuration
@@ -78,9 +80,19 @@ type NotificationManager struct {
 // NewNotificationManager creates a notification manager
 func NewNotificationManager(config *NotificationConfig) *NotificationManager {
 	if config == nil || !config.Enabled {
-		return &NotificationManager{
-			notifiers: []Notifier{},
-			config:    config,
+		return nil
+	}
+
+	// Set default notification cooldown if not specified
+	if config.NotificationCooldown == 0 {
+		if config.NotificationCooldownStr != "" {
+			if d, err := time.ParseDuration(config.NotificationCooldownStr); err == nil {
+				config.NotificationCooldown = d
+			} else {
+				config.NotificationCooldown = 24 * time.Hour // Default fallback
+			}
+		} else {
+			config.NotificationCooldown = 24 * time.Hour // Default if not specified
 		}
 	}
 
