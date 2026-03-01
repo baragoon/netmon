@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.26-alpine3.20 AS builder
+FROM golang:alpine AS builder
 
 WORKDIR /build
 
@@ -14,6 +14,9 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+
+# Tidy dependencies
+RUN go mod tidy
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o netmon .
