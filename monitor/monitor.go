@@ -11,21 +11,23 @@ import (
 
 // ConnectionMonitor monitors network connections
 type ConnectionMonitor struct {
-	config       *Config
-	logger       *log.Logger
-	prevConns    map[string]*Connection
-	alertHistory map[string]time.Time
-	notifier     *NotificationManager
+	config              *Config
+	logger              *log.Logger
+	prevConns           map[string]*Connection
+	alertHistory        map[string]time.Time
+	notificationHistory map[string]time.Time
+	notifier            *NotificationManager
 }
 
 // NewConnectionMonitor creates a new monitor
 func NewConnectionMonitor(config *Config, logger *log.Logger) (*ConnectionMonitor, error) {
 	return &ConnectionMonitor{
-		config:       config,
-		logger:       logger,
-		prevConns:    make(map[string]*Connection),
-		alertHistory: make(map[string]time.Time),
-		notifier:     NewNotificationManager(config.Notifications),
+		config:              config,
+		logger:              logger,
+		prevConns:           make(map[string]*Connection),
+		alertHistory:        make(map[string]time.Time),
+		notificationHistory: make(map[string]time.Time),
+		notifier:            NewNotificationManager(config.Notifications),
 	}, nil
 }
 
@@ -98,10 +100,7 @@ func (m *ConnectionMonitor) getConnections() ([]*Connection, error) {
 	}
 
 	for _, conn := range conns {
-		if conn.Status != "ESTABLISHED" {
-			continue
-		}
-
+		// Filter by PID if specified
 		if m.config.PID != 0 && int(conn.Pid) != m.config.PID {
 			continue
 		}
@@ -109,6 +108,13 @@ func (m *ConnectionMonitor) getConnections() ([]*Connection, error) {
 		procName := m.getProcessName(uint32(conn.Pid))
 		if procName == "" {
 			procName = "unknown"
+		}
+
+		// Track all TCP states and UDP datagrams
+		// For UDP, status may be empty or "NONE" since it's connectionless
+		state := conn.Status
+		if state == "" {
+			state = "NONE"
 		}
 
 		c := &Connection{
@@ -119,7 +125,7 @@ func (m *ConnectionMonitor) getConnections() ([]*Connection, error) {
 			RemoteIP:    ParseIP(conn.Raddr.IP),
 			RemotePort:  int(conn.Raddr.Port),
 			Protocol:    getProtocolString(conn.Type),
-			State:       conn.Status,
+			State:       state,
 		}
 
 		m.analyzeConnection(c)
@@ -152,8 +158,11 @@ func (m *ConnectionMonitor) getConnectionsPerProcess() ([]*Connection, error) {
 		procName, _ := p.Name()
 
 		for _, conn := range conns {
-			if conn.Status != "ESTABLISHED" {
-				continue
+			// Track all TCP states and UDP datagrams
+			// For UDP, status may be empty or "NONE" since it's connectionless
+			state := conn.Status
+			if state == "" {
+				state = "NONE"
 			}
 
 			c := &Connection{
@@ -164,7 +173,7 @@ func (m *ConnectionMonitor) getConnectionsPerProcess() ([]*Connection, error) {
 				RemoteIP:    ParseIP(conn.Raddr.IP),
 				RemotePort:  int(conn.Raddr.Port),
 				Protocol:    getProtocolString(conn.Type),
-				State:       conn.Status,
+				State:       state,
 			}
 
 			m.analyzeConnection(c)
@@ -178,6 +187,22 @@ func (m *ConnectionMonitor) getConnectionsPerProcess() ([]*Connection, error) {
 // analyzeConnection checks if a connection is anomalous
 func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	reasons := []string{}
+
+	// Check for suspicious TCP states (connection initiation attempts)
+	if c.Protocol == "tcp" && c.State == "SYN_SENT" && c.RemotePort != 80 && c.RemotePort != 443 {
+		reasons = append(reasons, fmt.Sprintf("TCP_SYN_SENT_%s:%d", c.RemoteIP, c.RemotePort))
+	}
+
+	// Check for listening ports (potential backdoors)
+	if c.State == "LISTEN" && c.LocalPort > 1024 {
+		reasons = append(reasons, fmt.Sprintf("LISTEN_PORT_%d", c.LocalPort))
+	}
+
+	// Check for UDP traffic (often used by malware for C2, DNS tunneling, etc.)
+	if c.Protocol == "udp" && c.RemotePort > 0 && c.RemotePort != 53 {
+		// Flag non-DNS UDP traffic
+		reasons = append(reasons, fmt.Sprintf("UDP_TRAFFIC_%s:%d", c.RemoteIP, c.RemotePort))
+	}
 
 	// Check for SSH connections
 	if m.config.AnomalousPatterns["ssh"] && c.RemotePort == 22 {
@@ -242,10 +267,24 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 	m.logger.Printf("⚠️  ALERT: %s", c.DetailedString())
 	m.alertHistory[key] = time.Now()
 
-	// Send notification
+	// Send notification only once per remote address to avoid spam
 	if m.notifier != nil {
-		if err := m.notifier.SendAlert(c); err != nil {
-			m.logger.Printf("Failed to send notification: %v", err)
+		remoteKey := c.remoteAddressKey()
+		lastNotification, notified := m.notificationHistory[remoteKey]
+		
+		// Get notification cooldown period from config (default 24h)
+		cooldown := 24 * time.Hour
+		if m.config.Notifications != nil && m.config.Notifications.NotificationCooldown > 0 {
+			cooldown = m.config.Notifications.NotificationCooldown
+		}
+		
+		// Send notification only if never sent before, or cooldown period has elapsed
+		if !notified || time.Since(lastNotification) > cooldown {
+			if err := m.notifier.SendAlert(c); err != nil {
+				m.logger.Printf("Failed to send notification: %v", err)
+			} else {
+				m.notificationHistory[remoteKey] = time.Now()
+			}
 		}
 	}
 }

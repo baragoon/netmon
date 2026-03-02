@@ -15,6 +15,7 @@
   "pid": 0,
   "notifications": {
     "enabled": true,
+    "notification_cooldown": "24h",
     "title_template": "🚨 Suspicious Connection Detected",
     "message_template": "Service: {service}\nRemote IP: {ip}:{port}\nProtocol: {protocol}\nReason: {reason}",
     "pushover": {

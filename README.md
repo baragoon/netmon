@@ -4,8 +4,13 @@ A simple Linux network connections monitor written in Go to detect abnormal netw
 
 ## Features
 
-- **Monitor Network Connections**: Track all established network connections on the system
+- **Monitor Network Connections**: Track all TCP states and active UDP datagrams on the system
+- **Track All TCP States**: Monitor connections in all states (SYN_SENT, ESTABLISHED, LISTEN, etc.) to catch malware during connection initiation
+- **UDP Monitoring**: Track UDP datagrams which are often used for DNS tunneling and C2 communications
 - **Detect Anomalies**: Alert on suspicious patterns like:
+  - TCP connection attempts (SYN_SENT) to non-standard ports
+  - Listening ports on non-privileged ports (potential backdoors)
+  - UDP traffic to non-DNS ports
   - Outgoing SSH connections (port 22)
   - Telnet connections (port 23)  
   - Remote access ports (RDP 3389, VNC 5900)
@@ -171,6 +176,45 @@ This expands the "safe" ports to include MySQL (3306), PostgreSQL (5432), and Re
 ## Notifications
 
 NetMon supports sending alerts to multiple notification services. Configure notifications in your config.json to get real-time alerts via your preferred channels.
+
+### Notification Deduplication
+
+To avoid spam, **notifications are sent only once per remote address** (IP:Port combination) within a configurable cooldown period. When the same address is detected multiple times:
+
+- **Logs**: Show all occurrences (rate-limited to once per minute per full connection)
+- **Notifications**: Sent only once per cooldown period per remote address
+
+Default cooldown is **24 hours**, but you can customize it:
+
+```json
+{
+  "notifications": {
+    "enabled": true,
+    "notification_cooldown": "2h",
+    "pushover": {
+      "enabled": true,
+      "api_key": "your_key",
+      "user_key": "your_user_key"
+    }
+  }
+}
+```
+
+**Cooldown Examples:**
+- `"1h"` - Notify once per hour per address
+- `"2h"` - Notify once every 2 hours
+- `"24h"` - Notify once per day (default)
+- `"168h"` - Notify once per week
+- `"30m"` - Notify once every 30 minutes
+
+**Example Behavior** (with `notification_cooldown: "2h"`):
+
+If malware at `203.0.113.42:8080` is detected:
+- First detection (00:00): Alert logged + notification sent ✉️
+- Subsequent detections (00:05, 00:30): Alerts logged only, no notification
+- Detection at 02:01 (>2h later): Alert logged + notification sent again ✉️
+
+This prevents notification flooding while maintaining comprehensive logs for forensic analysis.
 
 ### Supported Notification Providers
 
@@ -349,6 +393,35 @@ All enabled providers will receive alerts simultaneously.
 [netmon] 2026/02/25 10:30:50 monitor.go:91: NEW: curl (1234) -> 203.0.113.42:443 [tcp ESTABLISHED]
 [netmon] 2026/02/25 10:30:50 monitor.go:145: ⚠️  ALERT: ssh (5678) -> 192.168.1.100:22 [tcp ESTABLISHED] [ALERT: SSH_OUTBOUND]
 ```
+
+## Connection State Monitoring
+
+NetMon monitors **all TCP connection states** and **UDP datagrams**, not just established connections. This comprehensive approach helps detect malicious activity at different stages:
+
+### TCP States Tracked
+
+- **SYN_SENT**: Connection initiation attempts - catches malware as it tries to connect
+- **SYN_RECV**: Incoming connection requests - detects port scanning
+- **ESTABLISHED**: Active connections - normal traffic monitoring  
+- **LISTEN**: Open listening ports - detects backdoors and trojans
+- **CLOSE_WAIT, FIN_WAIT1/2**: Connection closing - tracks cleanup
+- **TIME_WAIT**: Recently closed connections
+
+### Why Track All States?
+
+Monitoring only ESTABLISHED connections misses critical security events:
+- **Malware starting sessions**: SYN_SENT states reveal connection attempts before they succeed
+- **Backdoor services**: LISTEN states expose unauthorized services waiting for commands
+- **Port scanning**: SYN_RECV patterns indicate reconnaissance activity
+
+### UDP Monitoring
+
+UDP is connectionless, so it doesn't have states like TCP. NetMon tracks all active UDP datagrams because:
+- **DNS tunneling**: Malware often uses DNS (port 53) to bypass firewalls
+- **C2 communications**: Command & control servers frequently use UDP
+- **Data exfiltration**: UDP's stateless nature makes it popular for covert channels
+
+Alerts trigger for UDP traffic to non-DNS ports, helping catch suspicious UDP-based communications.
 
 ## How It Works
 
