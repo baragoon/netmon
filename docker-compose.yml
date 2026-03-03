@@ -6,10 +6,12 @@ services:
     container_name: netmon
     # Use host network to monitor host connections
     network_mode: "host"
+    # Use host PID namespace to see host processes (required for process name lookup)
+    pid: "host"
     # Run as root to access network data
     user: "root"
-    # Optional: use privileged mode for maximum capabilities
-    # privileged: true
+    # Use privileged mode for maximum capabilities
+    privileged: true
     # Mount config file and /proc for process lookup
     volumes:
       - ./config.json:/app/config.json:ro
@@ -21,6 +23,6 @@ services:
     restart: unless-stopped
     # Recommendations based on your monitoring needs:
     # - Change interval: Modify the CMD defaults below
-    # - Add verbosity: Add "--verbose" flag below
+    # - Disable verbose: Remove "--verbose" flag below
     # - Use custom config: Uncomment volumes and add "--config /app/config.json"
-    command: ["--interval", "5s", "--alerts-only"]
+    command: ["--interval", "5s", "--alerts-only", "--verbose"]
