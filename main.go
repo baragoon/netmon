@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -41,7 +42,21 @@ func main() {
 
 	// Load configuration
 	config := monitor.DefaultConfig()
-	if *configPath != "" {
+	
+	// Auto-load config.json if it exists in the current directory and no config path specified
+	if *configPath == "" {
+		execPath, err := os.Executable()
+		if err == nil {
+			execDir := filepath.Dir(execPath)
+			autoConfigPath := filepath.Join(execDir, "config.json")
+			if _, err := os.Stat(autoConfigPath); err == nil {
+				logger.Printf("Auto-loading config from: %s", autoConfigPath)
+				if err := config.LoadFromFile(autoConfigPath); err != nil {
+					logger.Fatalf("Failed to load config: %v", err)
+				}
+			}
+		}
+	} else {
 		if err := config.LoadFromFile(*configPath); err != nil {
 			logger.Fatalf("Failed to load config: %v", err)
 		}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -165,8 +166,15 @@ func (nm *NotificationManager) SendAlert(conn *Connection) error {
 		return nil
 	}
 
+	// Get hostname for the notification
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+
 	// Build variable map
 	vars := map[string]string{
+		"hostname":  hostname,
 		"ip":        conn.RemoteIP,
 		"port":      fmt.Sprintf("%d", conn.RemotePort),
 		"service":   conn.ProcessName,

@@ -91,6 +91,8 @@ NetMon uses `--network host` mode to monitor the host's network connections from
 
 ### Configuration File
 
+**Auto-loading:** If you place a `config.json` file in the same directory as the `netmon` binary, it will be automatically loaded without needing the `-config` flag.
+
 Create a JSON config file to customize detection rules:
 
 ```json
@@ -230,6 +232,7 @@ Use dynamic variables in alert titles and messages to customize notifications:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
+| `{hostname}` | Server hostname | server-1, web-prod-01 |
 | `{ip}` | Remote IP address | 203.0.113.42 |
 | `{port}` | Remote port number | 22 |
 | `{service}` | Process/service name | ssh, curl |
@@ -251,8 +254,8 @@ Use dynamic variables in alert titles and messages to customize notifications:
 {
   "notifications": {
     "enabled": true,
-    "title_template": "🚨 {service} Connection Alert",
-    "message_template": "{service} connected to {ip}:{port}\nReason: {reason}",
+    "title_template": "🚨 [{hostname}] {service} Connection Alert",
+    "message_template": "Host: {hostname}\n{service} connected to {ip}:{port}\nReason: {reason}",
     "pushover": {
       "enabled": true,
       "api_key": "your_pushover_api_key",
@@ -272,8 +275,8 @@ Simple setup with no authentication required:
 {
   "notifications": {
     "enabled": true,
-    "title_template": "🚨 Network Alert: {service}",
-    "message_template": "{service} -> {ip}:{port} ({reason})",
+    "title_template": "🚨 [{hostname}] Network Alert: {service}",
+    "message_template": "Host: {hostname}\n{service} -> {ip}:{port} ({reason})",
     "ntfy": {
       "enabled": true,
       "topic": "my-netmon-alerts",
