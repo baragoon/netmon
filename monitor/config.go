@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +38,11 @@ type Config struct {
 	// (for example ephemeral client ports used by browsers/runners).
 	// Key is lowercase process name, value is list of inclusive ranges.
 	ProcessPortExclusions map[string][]PortRange
+
+	// Explicit allowlist for remote IPs/CIDRs used to suppress high-port alerts.
+	// Applies in addition to built-in loopback/private/link-local suppression.
+	AllowedRemoteIPs map[string]bool
+	AllowedRemoteCIDRs []*net.IPNet
 
 	// Verbose output
 	Verbose bool
@@ -73,6 +79,8 @@ func DefaultConfig() *Config {
 		},
 		WatchProcesses: map[string]bool{},
 		ProcessPortExclusions: map[string][]PortRange{},
+		AllowedRemoteIPs: map[string]bool{},
+		AllowedRemoteCIDRs: []*net.IPNet{},
 		Verbose:        false,
 		AlertsOnly:     false,
 		PID:            0,
@@ -94,6 +102,7 @@ func (c *Config) LoadFromFile(path string) error {
 		AnomalousPatterns   []string            `json:"anomalous_patterns"`
 		WatchProcesses      []string            `json:"watch_processes"`
 		ProcessPortExclusions map[string][]string `json:"process_port_exclusions"`
+		AllowedRemoteIPs    []string            `json:"allowed_remote_ips"`
 		Verbose             bool                `json:"verbose"`
 		AlertsOnly          bool                `json:"alerts_only"`
 		PID                 int                 `json:"pid"`
@@ -159,6 +168,36 @@ func (c *Config) LoadFromFile(path string) error {
 			if len(ranges) > 0 {
 				c.ProcessPortExclusions[processName] = ranges
 			}
+		}
+	}
+
+	if len(jc.AllowedRemoteIPs) > 0 {
+		c.AllowedRemoteIPs = make(map[string]bool)
+		c.AllowedRemoteCIDRs = make([]*net.IPNet, 0)
+
+		for _, entry := range jc.AllowedRemoteIPs {
+			trimmed := strings.TrimSpace(entry)
+			if trimmed == "" {
+				continue
+			}
+
+			if strings.Contains(trimmed, "/") {
+				_, cidr, err := net.ParseCIDR(trimmed)
+				if err != nil {
+					log.Printf("Ignoring invalid allowed_remote_ips CIDR %q: %v", trimmed, err)
+					continue
+				}
+				c.AllowedRemoteCIDRs = append(c.AllowedRemoteCIDRs, cidr)
+				continue
+			}
+
+			parsedIP := net.ParseIP(trimmed)
+			if parsedIP == nil {
+				log.Printf("Ignoring invalid allowed_remote_ips entry %q", trimmed)
+				continue
+			}
+
+			c.AllowedRemoteIPs[parsedIP.String()] = true
 		}
 	}
 
@@ -262,4 +301,34 @@ func parsePortRangeSpec(spec string) (PortRange, error) {
 	}
 
 	return PortRange{Start: port, End: port}, nil
+}
+
+// IsRemoteIPHighPortExcluded returns true when high-port alerts should be suppressed
+// for the given remote IP. Built-in exclusions include loopback/private/link-local
+// ranges (IPv4 + IPv6), and custom entries from allowed_remote_ips.
+func (c *Config) IsRemoteIPHighPortExcluded(remoteIP string) bool {
+	parsedIP := net.ParseIP(strings.TrimSpace(remoteIP))
+	if parsedIP == nil {
+		return false
+	}
+
+	if parsedIP.IsLoopback() || parsedIP.IsPrivate() || parsedIP.IsLinkLocalUnicast() {
+		return true
+	}
+
+	if c == nil {
+		return false
+	}
+
+	if c.AllowedRemoteIPs[parsedIP.String()] {
+		return true
+	}
+
+	for _, cidr := range c.AllowedRemoteCIDRs {
+		if cidr.Contains(parsedIP) {
+			return true
+		}
+	}
+
+	return false
 }

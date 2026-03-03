@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -208,6 +209,8 @@ func (nm *NotificationManager) SendAlert(conn *Connection) error {
 		message = conn.DetailedString()
 	}
 
+	message = sanitizeNotificationMessage(conn, message)
+
 	fmt.Printf("[notification] Sending alert to %d notifier(s)\n", len(nm.notifiers))
 	fmt.Printf("[notification] Title: %s\n", title)
 	fmt.Printf("[notification] Message: %s\n", message)
@@ -235,6 +238,45 @@ func (nm *NotificationManager) formatTemplate(template string, vars map[string]s
 		result = strings.ReplaceAll(result, placeholder, value)
 	}
 	return result
+}
+
+func sanitizeNotificationMessage(conn *Connection, message string) string {
+	if conn == nil {
+		return message
+	}
+
+	if conn.State != "LISTEN" || !isUnspecifiedRemoteEndpoint(conn.RemoteIP, conn.RemotePort) {
+		return message
+	}
+
+	lines := strings.Split(message, "\n")
+	filtered := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Remote IP:") {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+
+	return strings.Join(filtered, "\n")
+}
+
+func isUnspecifiedRemoteEndpoint(ip string, port int) bool {
+	if strings.TrimSpace(ip) == "" {
+		return true
+	}
+
+	parsed := net.ParseIP(strings.TrimSpace(ip))
+	if parsed == nil {
+		return false
+	}
+
+	if parsed.IsUnspecified() {
+		return true
+	}
+
+	return port == 0 && (parsed.String() == "0.0.0.0" || parsed.String() == "::")
 }
 
 // maskToken masks sensitive tokens for logging

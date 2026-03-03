@@ -282,7 +282,7 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	}
 
 	// Check for high ports if enabled (ephemeral range)
-	if m.config.AnomalousPatterns["high_ports"] && c.RemotePort > 49152 && !m.config.IsProcessPortExcluded(c.ProcessName, c.RemotePort) {
+	if m.config.AnomalousPatterns["high_ports"] && c.RemotePort > 49152 && !m.config.IsProcessPortExcluded(c.ProcessName, c.RemotePort) && !m.config.IsRemoteIPHighPortExcluded(c.RemoteIP) {
 		serviceName := GetServiceName(c.RemotePort)
 		if serviceName != "" {
 			reasons = append(reasons, fmt.Sprintf("HIGH_PORT_%s(%d)", serviceName, c.RemotePort))

@@ -105,6 +105,7 @@ Create a JSON config file to customize detection rules:
     "chromium": ["49152-65535"],
     "forgejo-runner": ["32768-65535"]
   },
+  "allowed_remote_ips": ["194.88.153.231", "203.0.113.0/24"],
   "watch_processes": [],
   "verbose": false,
   "alerts_only": true,
@@ -115,6 +116,8 @@ Create a JSON config file to customize detection rules:
 `listen_alert_cooldown` controls log alert rate-limiting for LISTEN events (default: `1m`).
 
 `process_port_exclusions` lets you suppress alerts for specific remote ports per process (exact ports like `"443"` or ranges like `"49152-65535"`). This is useful for noisy client apps that use ephemeral ports.
+
+`allowed_remote_ips` suppresses high-port alerts for specific remote IPs/CIDRs. NetMon also suppresses high-port alerts for loopback/private/link-local addresses by default (IPv4 + IPv6).
 
 Then run with:
 ```bash
@@ -167,7 +170,8 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
     "chromium": ["49152-65535"],
     "chrome": ["49152-65535"],
     "forgejo-runner": ["32768-65535"]
-  }
+  },
+  "allowed_remote_ips": ["194.88.153.231", "203.0.113.0/24"]
 }
 ```
 
