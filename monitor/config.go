@@ -12,6 +12,9 @@ type Config struct {
 	// Monitoring interval
 	Interval time.Duration
 
+	// Rate limit for LISTEN alerts in logs (default: 1m)
+	ListenAlertCooldown time.Duration
+
 	// Ports to watch for (non-standard)
 	StandardPorts map[int]bool
 
@@ -37,7 +40,8 @@ type Config struct {
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Interval: 5 * time.Second,
+		Interval:            5 * time.Second,
+		ListenAlertCooldown: 1 * time.Minute,
 		StandardPorts: map[int]bool{
 			// HTTP/HTTPS
 			80:  true,
@@ -69,14 +73,15 @@ func (c *Config) LoadFromFile(path string) error {
 	}
 
 	type jsonConfig struct {
-		Interval          string                `json:"interval"`
-		StandardPorts     []int                 `json:"standard_ports"`
-		AnomalousPatterns []string              `json:"anomalous_patterns"`
-		WatchProcesses    []string              `json:"watch_processes"`
-		Verbose           bool                  `json:"verbose"`
-		AlertsOnly        bool                  `json:"alerts_only"`
-		PID               int                   `json:"pid"`
-		Notifications     *NotificationConfig   `json:"notifications"`
+		Interval            string              `json:"interval"`
+		ListenAlertCooldown string              `json:"listen_alert_cooldown"`
+		StandardPorts       []int               `json:"standard_ports"`
+		AnomalousPatterns   []string            `json:"anomalous_patterns"`
+		WatchProcesses      []string            `json:"watch_processes"`
+		Verbose             bool                `json:"verbose"`
+		AlertsOnly          bool                `json:"alerts_only"`
+		PID                 int                 `json:"pid"`
+		Notifications       *NotificationConfig `json:"notifications"`
 	}
 
 	var jc jsonConfig
@@ -87,6 +92,12 @@ func (c *Config) LoadFromFile(path string) error {
 	if jc.Interval != "" {
 		if d, err := time.ParseDuration(jc.Interval); err == nil {
 			c.Interval = d
+		}
+	}
+
+	if jc.ListenAlertCooldown != "" {
+		if d, err := time.ParseDuration(jc.ListenAlertCooldown); err == nil {
+			c.ListenAlertCooldown = d
 		}
 	}
 

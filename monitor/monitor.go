@@ -267,8 +267,13 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 	key := c.connectionKey()
 	lastAlert, seen := m.alertHistory[key]
 
-	// Rate limit alerts to once per minute per connection
-	if seen && time.Since(lastAlert) < 1*time.Minute {
+	// Rate limit alerts per connection, with configurable cooldown for LISTEN alerts.
+	alertCooldown := 1 * time.Minute
+	if c.State == "LISTEN" && m.config != nil && m.config.ListenAlertCooldown > 0 {
+		alertCooldown = m.config.ListenAlertCooldown
+	}
+
+	if seen && time.Since(lastAlert) < alertCooldown {
 		return
 	}
 

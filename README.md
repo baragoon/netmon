@@ -98,6 +98,7 @@ Create a JSON config file to customize detection rules:
 ```json
 {
   "interval": "5s",
+  "listen_alert_cooldown": "1m",
   "standard_ports": [80, 443, 53],
   "anomalous_patterns": ["ssh", "telnet"],
   "watch_processes": [],
@@ -106,6 +107,8 @@ Create a JSON config file to customize detection rules:
   "pid": 0
 }
 ```
+
+`listen_alert_cooldown` controls log alert rate-limiting for LISTEN events (default: `1m`).
 
 Then run with:
 ```bash

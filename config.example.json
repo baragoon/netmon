@@ -1,5 +1,6 @@
 {
   "interval": "5s",
+  "listen_alert_cooldown": "1m",
   "standard_ports": [
     80,
     443,
