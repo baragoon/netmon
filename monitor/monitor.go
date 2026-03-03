@@ -99,10 +99,20 @@ func (m *ConnectionMonitor) checkConnections() {
 func (m *ConnectionMonitor) getConnections() ([]*Connection, error) {
 	var result []*Connection
 
-	// Get all connections
+	// Try to get connections per process first, as it provides accurate PID information
+	// This is more reliable than net.Connections() which often returns PID 0
+	procs, err := process.Processes()
+	if err == nil {
+		result = m.getConnectionsFromProcesses(procs)
+		if len(result) > 0 {
+			return result, nil
+		}
+	}
+
+	// Fallback to net.Connections if per-process method fails
 	conns, err := net.Connections("inet")
 	if err != nil {
-		// On some systems, might need root. Try getting per-process connections
+		// Final fallback: try per-process again
 		return m.getConnectionsPerProcess()
 	}
 
@@ -142,14 +152,9 @@ func (m *ConnectionMonitor) getConnections() ([]*Connection, error) {
 	return result, nil
 }
 
-// getConnectionsPerProcess gets connections from each process individually
-func (m *ConnectionMonitor) getConnectionsPerProcess() ([]*Connection, error) {
+// getConnectionsFromProcesses gets connections by iterating through all processes
+func (m *ConnectionMonitor) getConnectionsFromProcesses(procs []*process.Process) []*Connection {
 	var result []*Connection
-
-	procs, err := process.Processes()
-	if err != nil {
-		return result, err
-	}
 
 	for _, p := range procs {
 		if m.config.PID != 0 && int(p.Pid) != m.config.PID {
@@ -188,6 +193,17 @@ func (m *ConnectionMonitor) getConnectionsPerProcess() ([]*Connection, error) {
 		}
 	}
 
+	return result
+}
+
+// getConnectionsPerProcess gets connections from each process individually
+func (m *ConnectionMonitor) getConnectionsPerProcess() ([]*Connection, error) {
+	procs, err := process.Processes()
+	if err != nil {
+		return []*Connection{}, err
+	}
+
+	result := m.getConnectionsFromProcesses(procs)
 	return result, nil
 }
 
