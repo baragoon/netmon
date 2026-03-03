@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"netmon/monitor"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 func main() {
@@ -70,6 +72,7 @@ func main() {
 
 	// Load configuration
 	config := monitor.DefaultConfig()
+	var actualConfigPath string
 	
 	// Auto-load config.json if it exists in the current directory and no config path specified
 	if *configPath == "" {
@@ -78,14 +81,16 @@ func main() {
 			execDir := filepath.Dir(execPath)
 			autoConfigPath := filepath.Join(execDir, "config.json")
 			if _, err := os.Stat(autoConfigPath); err == nil {
-				logger.Printf("Auto-loading config from: %s", autoConfigPath)
-				if err := config.LoadFromFile(autoConfigPath); err != nil {
+				actualConfigPath = autoConfigPath
+				logger.Printf("Auto-loading config from: %s", actualConfigPath)
+				if err := config.LoadFromFile(actualConfigPath); err != nil {
 					logger.Fatalf("Failed to load config: %v", err)
 				}
 			}
 		}
 	} else {
-		if err := config.LoadFromFile(*configPath); err != nil {
+		actualConfigPath = *configPath
+		if err := config.LoadFromFile(actualConfigPath); err != nil {
 			logger.Fatalf("Failed to load config: %v", err)
 		}
 	}
@@ -102,6 +107,60 @@ func main() {
 
 	logger.Printf("Starting network connections monitor (interval: %v)", *interval)
 	logger.Printf("Watching for abnormal activity: %v", config.AnomalousPatterns)
+
+	// Setup config file watcher if config path is known
+	if actualConfigPath != "" {
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			logger.Printf("Warning: Failed to create config file watcher: %v", err)
+		} else {
+			defer watcher.Close()
+			
+			err = watcher.Add(actualConfigPath)
+			if err != nil {
+				logger.Printf("Warning: Failed to watch config file: %v", err)
+			} else {
+				logger.Printf("Watching config file for changes: %s", actualConfigPath)
+				
+				// Config file change handler
+				go func() {
+					for {
+						select {
+						case event, ok := <-watcher.Events:
+							if !ok {
+								return
+							}
+							
+							// React to write or create events
+							if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) {
+								logger.Printf("Config file changed, reloading: %s", actualConfigPath)
+								
+								newConfig := monitor.DefaultConfig()
+								if err := newConfig.LoadFromFile(actualConfigPath); err != nil {
+									logger.Printf("Error reloading config: %v", err)
+									continue
+								}
+								
+								// Apply CLI flag overrides
+								newConfig.Verbose = *verbose
+								newConfig.AlertsOnly = *alertOnly
+								newConfig.Interval = *interval
+								
+								// Update monitor config
+								m.UpdateConfig(newConfig)
+							}
+							
+						case err, ok := <-watcher.Errors:
+							if !ok {
+								return
+							}
+							logger.Printf("Config watcher error: %v", err)
+						}
+					}
+				}()
+			}
+		}
+	}
 
 	// Setup signal handling
 	sigChan := make(chan os.Signal, 1)

@@ -3,6 +3,7 @@ package monitor
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/net"
@@ -11,6 +12,7 @@ import (
 
 // ConnectionMonitor monitors network connections
 type ConnectionMonitor struct {
+	configMu            sync.RWMutex
 	config              *Config
 	logger              *log.Logger
 	prevConns           map[string]*Connection
@@ -38,9 +40,30 @@ func NewConnectionMonitor(config *Config, logger *log.Logger) (*ConnectionMonito
 	}, nil
 }
 
+// UpdateConfig safely updates the monitor configuration
+func (m *ConnectionMonitor) UpdateConfig(newConfig *Config) {
+	m.configMu.Lock()
+	defer m.configMu.Unlock()
+
+	m.config = newConfig
+	
+	// Recreate notification manager with new config
+	newNotifier := NewNotificationManager(newConfig.Notifications)
+	if newNotifier != nil {
+		m.logger.Printf("Config reloaded: Notification manager updated with %d provider(s)", len(newNotifier.notifiers))
+	}
+	m.notifier = newNotifier
+	
+	m.logger.Printf("Config reloaded: Watching for abnormal activity: %v", newConfig.AnomalousPatterns)
+}
+
 // Start begins monitoring connections
 func (m *ConnectionMonitor) Start(stop <-chan struct{}) {
-	ticker := time.NewTicker(m.config.Interval)
+	m.configMu.RLock()
+	interval := m.config.Interval
+	m.configMu.RUnlock()
+	
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
@@ -80,9 +103,14 @@ func (m *ConnectionMonitor) checkConnections() {
 		key := conn.connectionKey()
 		currentKeys[key] = true
 
-		if _, existed := m.prevConns[key]; !existed && !m.config.AlertsOnly {
+		m.configMu.RLock()
+		alertsOnly := m.config.AlertsOnly
+		verbose := m.config.Verbose
+		m.configMu.RUnlock()
+
+		if _, existed := m.prevConns[key]; !existed && !alertsOnly {
 			// New connection
-			if m.config.Verbose {
+			if verbose {
 				m.logger.Printf("NEW: %s", conn.String())
 			}
 		}
@@ -94,9 +122,14 @@ func (m *ConnectionMonitor) checkConnections() {
 	}
 
 	// Check for closed connections
+	m.configMu.RLock()
+	alertsOnly := m.config.AlertsOnly
+	verbose := m.config.Verbose
+	m.configMu.RUnlock()
+
 	for key, prevConn := range m.prevConns {
-		if !currentKeys[key] && !m.config.AlertsOnly {
-			if m.config.Verbose {
+		if !currentKeys[key] && !alertsOnly {
+			if verbose {
 				m.logger.Printf("CLOSED: %s", prevConn.String())
 			}
 		}
@@ -131,7 +164,11 @@ func (m *ConnectionMonitor) getConnections() ([]*Connection, error) {
 
 	for _, conn := range conns {
 		// Filter by PID if specified
-		if m.config.PID != 0 && int(conn.Pid) != m.config.PID {
+		m.configMu.RLock()
+		pid := m.config.PID
+		m.configMu.RUnlock()
+		
+		if pid != 0 && int(conn.Pid) != pid {
 			continue
 		}
 
@@ -170,7 +207,11 @@ func (m *ConnectionMonitor) getConnectionsFromProcesses(procs []*process.Process
 	var result []*Connection
 
 	for _, p := range procs {
-		if m.config.PID != 0 && int(p.Pid) != m.config.PID {
+		m.configMu.RLock()
+		pid := m.config.PID
+		m.configMu.RUnlock()
+		
+		if pid != 0 && int(p.Pid) != pid {
 			continue
 		}
 
@@ -222,6 +263,9 @@ func (m *ConnectionMonitor) getConnectionsPerProcess() ([]*Connection, error) {
 
 // analyzeConnection checks if a connection is anomalous
 func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
+	m.configMu.RLock()
+	defer m.configMu.RUnlock()
+	
 	reasons := []string{}
 
 	// Check for suspicious TCP states (connection initiation attempts)
@@ -321,11 +365,14 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 	key := c.connectionKey()
 	lastAlert, seen := m.alertHistory[key]
 
-	// Rate limit alerts per connection, with configurable cooldown for LISTEN alerts.
+	m.configMu.RLock()
 	alertCooldown := 1 * time.Minute
 	if c.State == "LISTEN" && m.config != nil && m.config.ListenAlertCooldown > 0 {
 		alertCooldown = m.config.ListenAlertCooldown
 	}
+	notifier := m.notifier
+	notificationConfig := m.config.Notifications
+	m.configMu.RUnlock()
 
 	if seen && time.Since(lastAlert) < alertCooldown {
 		return
@@ -336,15 +383,15 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 
 	// Send notification only once per cooldown key to avoid spam.
 	// LISTEN sockets bound to 0.0.0.0/:: are keyed by local port, not remote address.
-	if m.notifier != nil {
+	if notifier != nil {
 		if c.bypassNotificationCooldown() {
 			listenCooldown := time.Duration(0)
-			if m.config != nil && m.config.Notifications != nil {
-				listenCooldown = m.config.Notifications.ListenNotificationCooldown
+			if notificationConfig != nil {
+				listenCooldown = notificationConfig.ListenNotificationCooldown
 			}
 
 			if listenCooldown <= 0 {
-				if err := m.notifier.SendAlert(c); err != nil {
+				if err := notifier.SendAlert(c); err != nil {
 					m.logger.Printf("Failed to send notification: %v", err)
 				}
 				return
@@ -353,7 +400,7 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 			notificationKey := c.notificationCooldownKey()
 			lastNotification, notified := m.notificationHistory[notificationKey]
 			if !notified || time.Since(lastNotification) > listenCooldown {
-				if err := m.notifier.SendAlert(c); err != nil {
+				if err := notifier.SendAlert(c); err != nil {
 					m.logger.Printf("Failed to send notification: %v", err)
 				} else {
 					m.notificationHistory[notificationKey] = time.Now()
@@ -367,13 +414,13 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 		
 		// Get notification cooldown period from config (default 24h)
 		cooldown := 24 * time.Hour
-		if m.config.Notifications != nil && m.config.Notifications.NotificationCooldown > 0 {
-			cooldown = m.config.Notifications.NotificationCooldown
+		if notificationConfig != nil && notificationConfig.NotificationCooldown > 0 {
+			cooldown = notificationConfig.NotificationCooldown
 		}
 		
 		// Send notification only if never sent before, or cooldown period has elapsed
 		if !notified || time.Since(lastNotification) > cooldown {
-			if err := m.notifier.SendAlert(c); err != nil {
+			if err := notifier.SendAlert(c); err != nil {
 				m.logger.Printf("Failed to send notification: %v", err)
 			} else {
 				m.notificationHistory[notificationKey] = time.Now()
