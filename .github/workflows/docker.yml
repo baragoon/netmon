@@ -6,11 +6,8 @@ name: Docker
 # documentation.
 
 on:
-  schedule:
-    - cron: '34 8 * * *'
   push:
-    branches: [ "main" ]
-    # Publish semver tags as releases.
+    # Only build and push on version tags
     tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ "main" ]
@@ -71,7 +68,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=pr
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
