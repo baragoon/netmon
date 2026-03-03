@@ -107,7 +107,7 @@ Create a JSON config file to customize detection rules:
     "chromium": ["49152-65535"],
     "forgejo-runner": ["32768-65535"]
   },
-  "allowed_remote_ips": ["194.88.153.231", "203.0.113.0/24"],
+  "allowed_remote_ips": ["192.0.2.1", "203.0.113.0/24"],
   "watch_processes": [],
   "verbose": false,
   "alerts_only": true,
@@ -175,7 +175,7 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
     "chrome": ["49152-65535"],
     "forgejo-runner": ["32768-65535"]
   },
-  "allowed_remote_ips": ["194.88.153.231", "203.0.113.0/24"]
+  "allowed_remote_ips": ["192.0.2.1", "203.0.113.0/24"]
 }
 ```
 
@@ -274,7 +274,7 @@ Use dynamic variables in alert titles and messages to customize notifications:
 | `{port}` | Remote port number | 22 |
 | `{service}` | Process/service name | ssh, curl |
 | `{protocol}` | Connection protocol | tcp, udp |
-| `{local_ip}` | Local IP address | 192.168.1.100 |
+| `{local_ip}` | Local IP address | 198.51.100.100 |
 | `{local_port}` | Local port number | 54321 |
 | `{pid}` | Process ID | 1234 |
 | `{reason}` | Alert reason | SSH_OUTBOUND, TELNET_OUTBOUND |
@@ -431,7 +431,7 @@ All enabled providers will receive alerts simultaneously.
 [netmon] 2026/02/25 10:30:45 monitor.go:35: Starting network connections monitor (interval: 5s)
 [netmon] 2026/02/25 10:30:45 monitor.go:36: Watching for abnormal activity: map[ssh:true telnet:true]
 [netmon] 2026/02/25 10:30:50 monitor.go:91: NEW: curl (1234) -> 203.0.113.42:443 [tcp ESTABLISHED]
-[netmon] 2026/02/25 10:30:50 monitor.go:145: ⚠️  ALERT: ssh (5678) -> 192.168.1.100:22 [tcp ESTABLISHED] [ALERT: SSH_OUTBOUND]
+[netmon] 2026/02/25 10:30:50 monitor.go:145: ⚠️  ALERT: ssh (5678) -> 198.51.100.100:22 [tcp ESTABLISHED] [ALERT: SSH_OUTBOUND]
 ```
 
 ## Connection State Monitoring
