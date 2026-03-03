@@ -98,7 +98,7 @@ jobs:
       # multi-platform images and export cache
       # https://github.com/docker/setup-qemu-action
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@e81ee926704198119ecf8f6ecdac57ee11cc5edc # v3.6.0
+        uses: docker/setup-qemu-action@v3
 
       # https://github.com/docker/setup-buildx-action
       - name: Set up Docker Buildx
