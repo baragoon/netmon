@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/net"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/net"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 // ConnectionMonitor monitors network connections
@@ -29,7 +29,7 @@ func NewConnectionMonitor(config *Config, logger *log.Logger) (*ConnectionMonito
 	} else if config.Notifications != nil && config.Notifications.Enabled {
 		logger.Printf("Warning: Notifications enabled but no notification manager created")
 	}
-	
+
 	return &ConnectionMonitor{
 		config:              config,
 		logger:              logger,
@@ -46,14 +46,14 @@ func (m *ConnectionMonitor) UpdateConfig(newConfig *Config) {
 	defer m.configMu.Unlock()
 
 	m.config = newConfig
-	
+
 	// Recreate notification manager with new config
 	newNotifier := NewNotificationManager(newConfig.Notifications)
 	if newNotifier != nil {
 		m.logger.Printf("Config reloaded: Notification manager updated with %d provider(s)", len(newNotifier.notifiers))
 	}
 	m.notifier = newNotifier
-	
+
 	m.logger.Printf("Config reloaded: Watching for abnormal activity: %v", newConfig.AnomalousPatterns)
 }
 
@@ -62,7 +62,7 @@ func (m *ConnectionMonitor) Start(stop <-chan struct{}) {
 	m.configMu.RLock()
 	interval := m.config.Interval
 	m.configMu.RUnlock()
-	
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -167,7 +167,7 @@ func (m *ConnectionMonitor) getConnections() ([]*Connection, error) {
 		m.configMu.RLock()
 		pid := m.config.PID
 		m.configMu.RUnlock()
-		
+
 		if pid != 0 && int(conn.Pid) != pid {
 			continue
 		}
@@ -210,7 +210,7 @@ func (m *ConnectionMonitor) getConnectionsFromProcesses(procs []*process.Process
 		m.configMu.RLock()
 		pid := m.config.PID
 		m.configMu.RUnlock()
-		
+
 		if pid != 0 && int(p.Pid) != pid {
 			continue
 		}
@@ -265,7 +265,7 @@ func (m *ConnectionMonitor) getConnectionsPerProcess() ([]*Connection, error) {
 func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	m.configMu.RLock()
 	defer m.configMu.RUnlock()
-	
+
 	reasons := []string{}
 
 	// Check for suspicious TCP states (connection initiation attempts)
@@ -411,13 +411,13 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 
 		notificationKey := c.notificationCooldownKey()
 		lastNotification, notified := m.notificationHistory[notificationKey]
-		
+
 		// Get notification cooldown period from config (default 24h)
 		cooldown := 24 * time.Hour
 		if notificationConfig != nil && notificationConfig.NotificationCooldown > 0 {
 			cooldown = notificationConfig.NotificationCooldown
 		}
-		
+
 		// Send notification only if never sent before, or cooldown period has elapsed
 		if !notified || time.Since(lastNotification) > cooldown {
 			if err := notifier.SendAlert(c); err != nil {

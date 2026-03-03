@@ -12,15 +12,15 @@ import (
 
 // Connection represents a network connection
 type Connection struct {
-	PID        uint32
-	ProcessName string
-	LocalIP    string
-	LocalPort  int
-	RemoteIP   string
-	RemotePort int
-	Protocol   string
-	State      string
-	IsAnomalous bool
+	PID              uint32
+	ProcessName      string
+	LocalIP          string
+	LocalPort        int
+	RemoteIP         string
+	RemotePort       int
+	Protocol         string
+	State            string
+	IsAnomalous      bool
 	AnomalousReasons []string
 }
 
@@ -109,8 +109,8 @@ func (c *Connection) notificationCooldownKey() string {
 
 // ServiceNameCache caches service name lookups
 var (
-	serviceNameCache = make(map[int]string)
-	serviceNameMutex sync.RWMutex
+	serviceNameCache  = make(map[int]string)
+	serviceNameMutex  sync.RWMutex
 	servicesCacheLock sync.Once
 )
 
