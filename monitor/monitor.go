@@ -201,7 +201,8 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	}
 
 	// Check for listening ports (potential backdoors)
-	if c.State == "LISTEN" && c.LocalPort > 1024 {
+	// Track LISTEN alerts by local port and only alert when the port is not whitelisted.
+	if c.State == "LISTEN" && c.LocalPort > 0 && !m.config.StandardPorts[c.LocalPort] {
 		reasons = append(reasons, fmt.Sprintf("LISTEN_PORT_%d", c.LocalPort))
 	}
 
@@ -274,10 +275,11 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 	m.logger.Printf("⚠️  ALERT: %s", c.DetailedString())
 	m.alertHistory[key] = time.Now()
 
-	// Send notification only once per remote address to avoid spam
+	// Send notification only once per cooldown key to avoid spam.
+	// LISTEN sockets bound to 0.0.0.0/:: are keyed by local port, not remote address.
 	if m.notifier != nil {
-		remoteKey := c.remoteAddressKey()
-		lastNotification, notified := m.notificationHistory[remoteKey]
+		notificationKey := c.notificationCooldownKey()
+		lastNotification, notified := m.notificationHistory[notificationKey]
 		
 		// Get notification cooldown period from config (default 24h)
 		cooldown := 24 * time.Hour
@@ -290,7 +292,7 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 			if err := m.notifier.SendAlert(c); err != nil {
 				m.logger.Printf("Failed to send notification: %v", err)
 			} else {
-				m.notificationHistory[remoteKey] = time.Now()
+				m.notificationHistory[notificationKey] = time.Now()
 			}
 		}
 	}
