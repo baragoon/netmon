@@ -196,6 +196,7 @@ Default cooldown is **24 hours**, but you can customize it:
   "notifications": {
     "enabled": true,
     "notification_cooldown": "2h",
+    "listen_notification_cooldown": "30s",
     "pushover": {
       "enabled": true,
       "api_key": "your_key",
@@ -211,6 +212,11 @@ Default cooldown is **24 hours**, but you can customize it:
 - `"24h"` - Notify once per day (default)
 - `"168h"` - Notify once per week
 - `"30m"` - Notify once every 30 minutes
+
+**LISTEN Notification Cooldown:**
+- `listen_notification_cooldown` applies only to LISTEN alerts on `0.0.0.0` / `::`.
+- Default is `"0s"` (disabled), meaning those LISTEN notifications are sent immediately.
+- Set a value like `"30s"` or `"2m"` to deduplicate per LISTEN port during that window.
 
 **Example Behavior** (with `notification_cooldown: "2h"`):
 

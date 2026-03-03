@@ -17,6 +17,7 @@
   "notifications": {
     "enabled": true,
     "notification_cooldown": "24h",
+    "listen_notification_cooldown": "0s",
     "title_template": "🚨 NetMon Alert [{hostname}]",
     "message_template": "Host: {hostname}\nService: {service}\nRemote IP: {ip}:{port}\nProtocol: {protocol}\nReason: {reason}",
     "pushover": {

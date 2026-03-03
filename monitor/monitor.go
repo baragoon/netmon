@@ -284,8 +284,26 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 	// LISTEN sockets bound to 0.0.0.0/:: are keyed by local port, not remote address.
 	if m.notifier != nil {
 		if c.bypassNotificationCooldown() {
-			if err := m.notifier.SendAlert(c); err != nil {
-				m.logger.Printf("Failed to send notification: %v", err)
+			listenCooldown := time.Duration(0)
+			if m.config != nil && m.config.Notifications != nil {
+				listenCooldown = m.config.Notifications.ListenNotificationCooldown
+			}
+
+			if listenCooldown <= 0 {
+				if err := m.notifier.SendAlert(c); err != nil {
+					m.logger.Printf("Failed to send notification: %v", err)
+				}
+				return
+			}
+
+			notificationKey := c.notificationCooldownKey()
+			lastNotification, notified := m.notificationHistory[notificationKey]
+			if !notified || time.Since(lastNotification) > listenCooldown {
+				if err := m.notifier.SendAlert(c); err != nil {
+					m.logger.Printf("Failed to send notification: %v", err)
+				} else {
+					m.notificationHistory[notificationKey] = time.Now()
+				}
 			}
 			return
 		}

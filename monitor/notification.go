@@ -12,16 +12,18 @@ import (
 
 // NotificationConfig holds the configuration for all notification providers
 type NotificationConfig struct {
-	Enabled             bool                   `json:"enabled"`
-	NotificationCooldown time.Duration         `json:"-"` // Internal field, set from NotificationCooldownStr
-	NotificationCooldownStr string             `json:"notification_cooldown"` // JSON field e.g. "1h", "24h"
-	Pushover            *PushoverConfig        `json:"pushover,omitempty"`
-	Ntfy                *NtfyConfig            `json:"ntfy,omitempty"`
-	Pushbullet          *PushbulletConfig      `json:"pushbullet,omitempty"`
-	Telegram            *TelegramConfig        `json:"telegram,omitempty"`
-	Webhook             *WebhookConfig         `json:"webhook,omitempty"`
-	TitleTemplate       string                 `json:"title_template"`
-	MessageTemplate     string                 `json:"message_template"`
+	Enabled                        bool              `json:"enabled"`
+	NotificationCooldown           time.Duration     `json:"-"` // Internal field, set from NotificationCooldownStr
+	NotificationCooldownStr        string            `json:"notification_cooldown"` // JSON field e.g. "1h", "24h"
+	ListenNotificationCooldown     time.Duration     `json:"-"` // Internal field, set from ListenNotificationCooldownStr
+	ListenNotificationCooldownStr  string            `json:"listen_notification_cooldown"` // LISTEN-specific cooldown; "0s" disables cooldown
+	Pushover                       *PushoverConfig   `json:"pushover,omitempty"`
+	Ntfy                           *NtfyConfig       `json:"ntfy,omitempty"`
+	Pushbullet                     *PushbulletConfig `json:"pushbullet,omitempty"`
+	Telegram                       *TelegramConfig   `json:"telegram,omitempty"`
+	Webhook                        *WebhookConfig    `json:"webhook,omitempty"`
+	TitleTemplate                  string            `json:"title_template"`
+	MessageTemplate                string            `json:"message_template"`
 }
 
 // PushoverConfig holds Pushover API configuration
@@ -95,6 +97,15 @@ func NewNotificationManager(config *NotificationConfig) *NotificationManager {
 			}
 		} else {
 			config.NotificationCooldown = 24 * time.Hour // Default if not specified
+		}
+	}
+
+	if config.ListenNotificationCooldownStr != "" {
+		if d, err := time.ParseDuration(config.ListenNotificationCooldownStr); err == nil {
+			config.ListenNotificationCooldown = d
+		} else {
+			config.ListenNotificationCooldown = 0
+			fmt.Printf("[notification] Warning: Failed to parse LISTEN notification cooldown '%s', using 0s (disabled)\n", config.ListenNotificationCooldownStr)
 		}
 	}
 
