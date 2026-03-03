@@ -15,13 +15,11 @@ services:
     # Mount config file and /proc for process lookup
     volumes:
       - ./config.json:/app/config.json:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
+      - /proc:/proc:ro
+      - /sys:/sys:ro
     # Set environment variables if needed
     environment:
       - TZ=Europe/Kyiv
-      - HOST_PROC=/host/proc
-      - HOST_SYS=/host/sys
     # Keep container running
     restart: unless-stopped
     # Recommendations based on your monitoring needs:
