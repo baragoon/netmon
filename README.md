@@ -33,7 +33,7 @@ A simple Linux network connections monitor written in Go to detect abnormal netw
 
 ```bash
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/baragoon/netmon.git
 cd netmon
 
 # Build the project

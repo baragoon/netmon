@@ -23,7 +23,8 @@ NetMon monitors Linux network connections in real-time and alerts on suspicious 
 
 ## Dependencies
 
-- `github.com/shirou/gopsutil/v3` - For system network information
+- `github.com/shirou/gopsutil/v4` - For system network information
+- `github.com/fsnotify/fsnotify` - For config file watching
 
 ## Building
 
