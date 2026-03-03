@@ -87,6 +87,12 @@ func (c *Connection) remoteAddressKey() string {
 	return fmt.Sprintf("%s:%d", c.RemoteIP, c.RemotePort)
 }
 
+// bypassNotificationCooldown returns true for LISTEN sockets bound to
+// unspecified addresses, where each alert should be notified immediately.
+func (c *Connection) bypassNotificationCooldown() bool {
+	return c.State == "LISTEN" && (c.RemoteIP == "0.0.0.0" || c.RemoteIP == "::" || c.RemoteIP == "")
+}
+
 // notificationCooldownKey creates a key for notification cooldown deduplication.
 // For LISTEN sockets bound to unspecified addresses (0.0.0.0/::), deduplicate by
 // local port so different LISTEN ports are tracked independently.

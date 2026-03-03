@@ -278,6 +278,13 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 	// Send notification only once per cooldown key to avoid spam.
 	// LISTEN sockets bound to 0.0.0.0/:: are keyed by local port, not remote address.
 	if m.notifier != nil {
+		if c.bypassNotificationCooldown() {
+			if err := m.notifier.SendAlert(c); err != nil {
+				m.logger.Printf("Failed to send notification: %v", err)
+			}
+			return
+		}
+
 		notificationKey := c.notificationCooldownKey()
 		lastNotification, notified := m.notificationHistory[notificationKey]
 		
