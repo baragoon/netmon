@@ -32,7 +32,10 @@ WORKDIR /app
 # Copy the binary from builder
 COPY --from=builder /build/netmon /app/netmon
 
-# Copy example config (optional)
+# Copy example config as default config
+COPY config.example.json* /app/config.json
+
+# Keep example config for reference
 COPY config.example.json* /app/config.example.json
 
 # Run as root (required for network monitoring)
