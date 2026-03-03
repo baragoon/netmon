@@ -3,6 +3,7 @@ package monitor
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"time"
 )
 
@@ -116,6 +117,35 @@ func (c *Config) LoadFromFile(path string) error {
 
 	if jc.Notifications != nil {
 		c.Notifications = jc.Notifications
+		// Log notification configuration status
+		if jc.Notifications.Enabled {
+			var enabledProviders []string
+			if jc.Notifications.Pushover != nil && jc.Notifications.Pushover.Enabled {
+				enabledProviders = append(enabledProviders, "Pushover")
+			}
+			if jc.Notifications.Ntfy != nil && jc.Notifications.Ntfy.Enabled {
+				enabledProviders = append(enabledProviders, "Ntfy")
+			}
+			if jc.Notifications.Pushbullet != nil && jc.Notifications.Pushbullet.Enabled {
+				enabledProviders = append(enabledProviders, "Pushbullet")
+			}
+			if jc.Notifications.Telegram != nil && jc.Notifications.Telegram.Enabled {
+				enabledProviders = append(enabledProviders, "Telegram")
+			}
+			if jc.Notifications.Webhook != nil && jc.Notifications.Webhook.Enabled {
+				enabledProviders = append(enabledProviders, "Webhook")
+			}
+			if len(enabledProviders) > 0 {
+				log.Printf("Notifications enabled with providers: %v", enabledProviders)
+			} else {
+				log.Printf("Notifications enabled but no providers configured")
+			}
+			if jc.Notifications.NotificationCooldownStr != "" {
+				log.Printf("Notification cooldown: %s", jc.Notifications.NotificationCooldownStr)
+			}
+		} else {
+			log.Printf("Notifications disabled")
+		}
 	}
 
 	return nil

@@ -90,6 +90,7 @@ func NewNotificationManager(config *NotificationConfig) *NotificationManager {
 				config.NotificationCooldown = d
 			} else {
 				config.NotificationCooldown = 24 * time.Hour // Default fallback
+				fmt.Printf("[notification] Warning: Failed to parse cooldown duration '%s', using default 24h\n", config.NotificationCooldownStr)
 			}
 		} else {
 			config.NotificationCooldown = 24 * time.Hour // Default if not specified
@@ -105,19 +106,54 @@ func NewNotificationManager(config *NotificationConfig) *NotificationManager {
 
 	// Initialize enabled notifiers
 	if config.Pushover != nil && config.Pushover.Enabled {
-		nm.notifiers = append(nm.notifiers, &PushoverNotifier{config: config.Pushover})
+		notifier := &PushoverNotifier{config: config.Pushover}
+		if notifier.Enabled() {
+			nm.notifiers = append(nm.notifiers, notifier)
+			fmt.Printf("[notification] Pushover notifier enabled\n")
+		} else {
+			fmt.Printf("[notification] Warning: Pushover enabled but missing required configuration\n")
+		}
 	}
 	if config.Ntfy != nil && config.Ntfy.Enabled {
-		nm.notifiers = append(nm.notifiers, &NtfyNotifier{config: config.Ntfy})
+		notifier := &NtfyNotifier{config: config.Ntfy}
+		if notifier.Enabled() {
+			nm.notifiers = append(nm.notifiers, notifier)
+			fmt.Printf("[notification] Ntfy notifier enabled\n")
+		} else {
+			fmt.Printf("[notification] Warning: Ntfy enabled but missing required configuration\n")
+		}
 	}
 	if config.Pushbullet != nil && config.Pushbullet.Enabled {
-		nm.notifiers = append(nm.notifiers, &PushbulletNotifier{config: config.Pushbullet})
+		notifier := &PushbulletNotifier{config: config.Pushbullet}
+		if notifier.Enabled() {
+			nm.notifiers = append(nm.notifiers, notifier)
+			fmt.Printf("[notification] Pushbullet notifier enabled\n")
+		} else {
+			fmt.Printf("[notification] Warning: Pushbullet enabled but missing required configuration\n")
+		}
 	}
 	if config.Telegram != nil && config.Telegram.Enabled {
-		nm.notifiers = append(nm.notifiers, &TelegramNotifier{config: config.Telegram})
+		notifier := &TelegramNotifier{config: config.Telegram}
+		if notifier.Enabled() {
+			nm.notifiers = append(nm.notifiers, notifier)
+			fmt.Printf("[notification] Telegram notifier enabled (bot token: %s..., chat ID: %s)\n",
+				maskToken(config.Telegram.BotToken), config.Telegram.ChatID)
+		} else {
+			fmt.Printf("[notification] Warning: Telegram enabled but missing required configuration (bot_token or chat_id)\n")
+		}
 	}
 	if config.Webhook != nil && config.Webhook.Enabled {
-		nm.notifiers = append(nm.notifiers, &WebhookNotifier{config: config.Webhook})
+		notifier := &WebhookNotifier{config: config.Webhook}
+		if notifier.Enabled() {
+			nm.notifiers = append(nm.notifiers, notifier)
+			fmt.Printf("[notification] Webhook notifier enabled (URL: %s)\n", config.Webhook.URL)
+		} else {
+			fmt.Printf("[notification] Warning: Webhook enabled but missing required configuration\n")
+		}
+	}
+
+	if len(nm.notifiers) == 0 {
+		fmt.Printf("[notification] Warning: Notifications enabled but no valid notifiers configured\n")
 	}
 
 	return nm
@@ -153,12 +189,18 @@ func (nm *NotificationManager) SendAlert(conn *Connection) error {
 		message = conn.DetailedString()
 	}
 
+	fmt.Printf("[notification] Sending alert to %d notifier(s)\n", len(nm.notifiers))
+	fmt.Printf("[notification] Title: %s\n", title)
+	fmt.Printf("[notification] Message: %s\n", message)
+
 	// Send through all notifiers
 	for _, notifier := range nm.notifiers {
 		if notifier.Enabled() {
 			if err := notifier.Send(title, message); err != nil {
 				// Log error but continue sending to other notifiers
 				fmt.Printf("[notification] Error sending alert: %v\n", err)
+			} else {
+				fmt.Printf("[notification] Alert sent successfully\n")
 			}
 		}
 	}
@@ -174,6 +216,14 @@ func (nm *NotificationManager) formatTemplate(template string, vars map[string]s
 		result = strings.ReplaceAll(result, placeholder, value)
 	}
 	return result
+}
+
+// maskToken masks sensitive tokens for logging
+func maskToken(token string) string {
+	if len(token) <= 8 {
+		return "***"
+	}
+	return token[:8]
 }
 
 // PushoverNotifier sends notifications via Pushover
