@@ -21,10 +21,11 @@ type Connection struct {
 	AnomalousReasons []string
 }
 
-// ParseIP extracts IP from address endpoint (may include port after colon)
+// ParseIP returns the IP address, handling both IPv4 and IPv6
 func ParseIP(addr string) string {
-	parts := strings.Split(addr, ":")
-	return parts[0]
+	// gopsutil already provides IP separately from port, so just return as-is
+	// This preserves IPv6 addresses which contain colons
+	return addr
 }
 
 // ParsePort extracts port from address endpoint (after colon)
