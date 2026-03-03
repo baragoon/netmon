@@ -35,8 +35,8 @@ go build -o netmon .
 
 ```bash
 sudo ./netmon
-sudo ./netmon -interval 10s -verbose
-sudo ./netmon -alerts-only -config ./config.json
+sudo ./netmon --interval 10s --verbose
+sudo ./netmon --alerts-only --config ./config.json
 ```
 
 ## Key Features
@@ -52,11 +52,11 @@ sudo ./netmon -alerts-only -config ./config.json
 
 Run with verbose mode to see all connections:
 ```bash
-sudo ./netmon -verbose
+sudo ./netmon --verbose
 ```
 
 Test SSH detection:
 ```bash
 ssh user@example.com &
-sudo ./netmon -interval 2s -alerts-only
+sudo ./netmon --interval 2s --alerts-only
 ```

@@ -52,19 +52,19 @@ go install .
 sudo ./netmon
 
 # Run with custom interval
-sudo ./netmon -interval 10s
+sudo ./netmon --interval 10s
 
 # Only show alerts (filter normal activity)
-sudo ./netmon -alerts-only
+sudo ./netmon --alerts-only
 
 # Enable verbose output
-sudo ./netmon -verbose
+sudo ./netmon --verbose
 
 # Log to file (outputs to both stdout and file)
-sudo ./netmon -log /var/log/netmon.log
+sudo ./netmon --log /var/log/netmon.log
 
 # Monitor specific process (by PID)
-sudo ./netmon -interval 5s  # Add filtering by PID if needed
+sudo ./netmon --interval 5s  # Add filtering by PID if needed
 ```
 
 ### Docker Usage
@@ -76,22 +76,22 @@ docker-compose logs -f
 
 # Or build and run manually
 docker build -t netmon .
-docker run --rm --network host netmon -interval 5s -alerts-only
+docker run --rm --network host netmon --interval 5s --alerts-only
 ```
 
 NetMon uses `--network host` mode to monitor the host's network connections from inside the container.
 
 ### Command-line Options
 
-- `-interval`: Monitoring interval (default: 5s)
-- `-verbose`: Show all connections, not just anomalies
-- `-alerts-only`: Only show flagged suspicious connections
-- `-config`: Path to JSON configuration file
-- `-log`: Optional path to log file (logs to stdout if not specified)
+- `--interval`: Monitoring interval (default: 5s)
+- `--verbose`: Show all connections, not just anomalies
+- `--alerts-only`: Only show flagged suspicious connections
+- `--config`: Path to JSON configuration file
+- `--log`: Optional path to log file (logs to stdout if not specified)
 
 ### Configuration File
 
-**Auto-loading:** If you place a `config.json` file in the same directory as the `netmon` binary, it will be automatically loaded without needing the `-config` flag.
+**Auto-loading:** If you place a `config.json` file in the same directory as the `netmon` binary, it will be automatically loaded without needing the `--config` flag.
 
 Create a JSON config file to customize detection rules:
 
@@ -109,7 +109,7 @@ Create a JSON config file to customize detection rules:
 
 Then run with:
 ```bash
-sudo ./netmon -config /path/to/config.json
+sudo ./netmon --config /path/to/config.json
 ```
 
 ## Anomalous Patterns
@@ -450,7 +450,7 @@ Alerts trigger for UDP traffic to non-DNS ports, helping catch suspicious UDP-ba
 ## Security Considerations
 
 - Run with minimum required privileges
-- Be cautious with -verbose flag on high-traffic systems
+- Be cautious with --verbose flag on high-traffic systems
 - SSH/Telnet alerts are defaults - customize as needed
 - Consider running in a container or VM for isolation
 
@@ -471,7 +471,7 @@ sudo setcap cap_net_admin,cap_sys_chroot,cap_dac_override=ep ./netmon
 ### High resource usage
 Increase the monitoring interval:
 ```bash
-sudo ./netmon -interval 30s
+sudo ./netmon --interval 30s
 ```
 
 ## Development
