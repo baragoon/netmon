@@ -10,9 +10,10 @@ services:
     user: "root"
     # Optional: use privileged mode for maximum capabilities
     # privileged: true
-    # Mount config file
+    # Mount config file and /proc for process lookup
     volumes:
       - ./config.json:/app/config.json:ro
+      - /proc:/proc:ro
     # Set environment variables if needed
     environment:
       - TZ=Europe/Kyiv
