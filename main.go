@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -20,6 +21,33 @@ func main() {
 	alertOnly := flag.Bool("alerts-only", false, "Only show alerts for abnormal activity")
 	configPath := flag.String("config", "", "Path to configuration file")
 	logPath := flag.String("log", "", "Optional path to log file (logs to stdout if not specified)")
+
+	// Customize usage output to use double-dash format
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of netmon:\n")
+		flag.VisitAll(func(f *flag.Flag) {
+			// Extract flag name and type
+			name, usage := flag.UnquoteUsage(f)
+			
+			// Format the flag line
+			if name == "" {
+				// Boolean flag
+				fmt.Fprintf(os.Stderr, "  --%s\n", f.Name)
+			} else {
+				// Flag with value
+				fmt.Fprintf(os.Stderr, "  --%s %s\n", f.Name, name)
+			}
+			
+			// Print usage description with proper indentation
+			fmt.Fprintf(os.Stderr, "        %s", usage)
+			
+			// Add default value if not a zero value
+			if f.DefValue != "" && f.DefValue != "false" && f.DefValue != "0" {
+				fmt.Fprintf(os.Stderr, " (default %s)", f.DefValue)
+			}
+			fmt.Fprintf(os.Stderr, "\n")
+		})
+	}
 
 	flag.Parse()
 
