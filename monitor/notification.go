@@ -226,6 +226,14 @@ func maskToken(token string) string {
 	return token[:8]
 }
 
+// escapeHTML escapes HTML special characters for Telegram HTML mode
+func escapeHTML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	return s
+}
+
 // PushoverNotifier sends notifications via Pushover
 type PushoverNotifier struct {
 	config *PushoverConfig
@@ -379,12 +387,15 @@ func (tn *TelegramNotifier) Send(title, message string) error {
 		return fmt.Errorf("telegram not configured")
 	}
 
-	fullMessage := fmt.Sprintf("*%s*\n\n%s", title, message)
+	// Use HTML mode instead of Markdown to avoid issues with underscores and other special characters
+	// Escape HTML special characters in the message content
+	escapedMessage := escapeHTML(message)
+	fullMessage := fmt.Sprintf("<b>%s</b>\n\n%s", escapeHTML(title), escapedMessage)
 
 	data := map[string]string{
 		"chat_id":    tn.config.ChatID,
 		"text":       fullMessage,
-		"parse_mode": "Markdown",
+		"parse_mode": "HTML",
 	}
 
 	jsonData, err := json.Marshal(data)
