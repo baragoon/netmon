@@ -101,6 +101,10 @@ Create a JSON config file to customize detection rules:
   "listen_alert_cooldown": "1m",
   "standard_ports": [80, 443, 53],
   "anomalous_patterns": ["ssh", "telnet"],
+  "process_port_exclusions": {
+    "chromium": ["49152-65535"],
+    "forgejo-runner": ["32768-65535"]
+  },
   "watch_processes": [],
   "verbose": false,
   "alerts_only": true,
@@ -109,6 +113,8 @@ Create a JSON config file to customize detection rules:
 ```
 
 `listen_alert_cooldown` controls log alert rate-limiting for LISTEN events (default: `1m`).
+
+`process_port_exclusions` lets you suppress alerts for specific remote ports per process (exact ports like `"443"` or ranges like `"49152-65535"`). This is useful for noisy client apps that use ephemeral ports.
 
 Then run with:
 ```bash
@@ -152,6 +158,20 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
   "anomalous_patterns": ["external", "high_ports"]
 }
 ```
+
+**Reduce high-port noise for specific apps (balanced):**
+```json
+{
+  "anomalous_patterns": ["ssh", "telnet", "high_ports"],
+  "process_port_exclusions": {
+    "chromium": ["49152-65535"],
+    "chrome": ["49152-65535"],
+    "forgejo-runner": ["32768-65535"]
+  }
+}
+```
+
+Note: LISTEN alerts on non-standard ports are still reported, including high ports.
 
 **Custom strict monitoring (all patterns enabled):**
 ```json

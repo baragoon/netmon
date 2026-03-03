@@ -2,10 +2,19 @@ package monitor
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 )
+
+// PortRange represents an inclusive port range.
+type PortRange struct {
+	Start int
+	End   int
+}
 
 // Config holds the monitor configuration
 type Config struct {
@@ -23,6 +32,11 @@ type Config struct {
 
 	// Process names to watch
 	WatchProcesses map[string]bool
+
+	// Per-process remote port exclusions for alerting, used to reduce noise
+	// (for example ephemeral client ports used by browsers/runners).
+	// Key is lowercase process name, value is list of inclusive ranges.
+	ProcessPortExclusions map[string][]PortRange
 
 	// Verbose output
 	Verbose bool
@@ -58,6 +72,7 @@ func DefaultConfig() *Config {
 			"low_ports":   false, // Privileged ports < 1024
 		},
 		WatchProcesses: map[string]bool{},
+		ProcessPortExclusions: map[string][]PortRange{},
 		Verbose:        false,
 		AlertsOnly:     false,
 		PID:            0,
@@ -78,6 +93,7 @@ func (c *Config) LoadFromFile(path string) error {
 		StandardPorts       []int               `json:"standard_ports"`
 		AnomalousPatterns   []string            `json:"anomalous_patterns"`
 		WatchProcesses      []string            `json:"watch_processes"`
+		ProcessPortExclusions map[string][]string `json:"process_port_exclusions"`
 		Verbose             bool                `json:"verbose"`
 		AlertsOnly          bool                `json:"alerts_only"`
 		PID                 int                 `json:"pid"`
@@ -122,6 +138,30 @@ func (c *Config) LoadFromFile(path string) error {
 		}
 	}
 
+	if len(jc.ProcessPortExclusions) > 0 {
+		c.ProcessPortExclusions = make(map[string][]PortRange)
+		for process, specs := range jc.ProcessPortExclusions {
+			processName := strings.ToLower(strings.TrimSpace(process))
+			if processName == "" {
+				continue
+			}
+
+			ranges := make([]PortRange, 0, len(specs))
+			for _, spec := range specs {
+				portRange, err := parsePortRangeSpec(spec)
+				if err != nil {
+					log.Printf("Ignoring invalid process_port_exclusions entry %q for %s: %v", spec, processName, err)
+					continue
+				}
+				ranges = append(ranges, portRange)
+			}
+
+			if len(ranges) > 0 {
+				c.ProcessPortExclusions[processName] = ranges
+			}
+		}
+	}
+
 	c.Verbose = jc.Verbose
 	c.AlertsOnly = jc.AlertsOnly
 	c.PID = jc.PID
@@ -160,4 +200,66 @@ func (c *Config) LoadFromFile(path string) error {
 	}
 
 	return nil
+}
+
+// IsProcessPortExcluded returns true if the process has an exclusion for the given port.
+func (c *Config) IsProcessPortExcluded(processName string, port int) bool {
+	if c == nil || len(c.ProcessPortExclusions) == 0 || port < 0 {
+		return false
+	}
+
+	normalizedProcessName := strings.ToLower(strings.TrimSpace(processName))
+	ranges, exists := c.ProcessPortExclusions[normalizedProcessName]
+	if !exists {
+		return false
+	}
+
+	for _, portRange := range ranges {
+		if port >= portRange.Start && port <= portRange.End {
+			return true
+		}
+	}
+
+	return false
+}
+
+func parsePortRangeSpec(spec string) (PortRange, error) {
+	trimmed := strings.TrimSpace(spec)
+	if trimmed == "" {
+		return PortRange{}, fmt.Errorf("empty port range")
+	}
+
+	if strings.Contains(trimmed, "-") {
+		parts := strings.SplitN(trimmed, "-", 2)
+		if len(parts) != 2 {
+			return PortRange{}, fmt.Errorf("invalid range format")
+		}
+
+		start, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+		if err != nil {
+			return PortRange{}, fmt.Errorf("invalid range start")
+		}
+
+		end, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+		if err != nil {
+			return PortRange{}, fmt.Errorf("invalid range end")
+		}
+
+		if start < 0 || end > 65535 || start > end {
+			return PortRange{}, fmt.Errorf("range must satisfy 0 <= start <= end <= 65535")
+		}
+
+		return PortRange{Start: start, End: end}, nil
+	}
+
+	port, err := strconv.Atoi(trimmed)
+	if err != nil {
+		return PortRange{}, fmt.Errorf("invalid port")
+	}
+
+	if port < 0 || port > 65535 {
+		return PortRange{}, fmt.Errorf("port must be in 0..65535")
+	}
+
+	return PortRange{Start: port, End: port}, nil
 }

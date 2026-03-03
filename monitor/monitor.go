@@ -61,9 +61,22 @@ func (m *ConnectionMonitor) checkConnections() {
 		return
 	}
 
+	// Deduplicate LISTEN connections: track seen local ports to avoid reporting IPv4 and IPv6 separately
+	seenListenPorts := make(map[int]bool)
+
 	// Check for new or changed connections
 	currentKeys := make(map[string]bool)
 	for _, conn := range connections {
+		// Skip duplicate LISTEN on same port for IPv4/IPv6
+		// Report only the first one seen (typically IPv4)
+		if conn.State == "LISTEN" && conn.LocalPort > 0 {
+			if seenListenPorts[conn.LocalPort] {
+				// Already reported this LISTEN port, skip the duplicate (IPv6 variant)
+				continue
+			}
+			seenListenPorts[conn.LocalPort] = true
+		}
+
 		key := conn.connectionKey()
 		currentKeys[key] = true
 
@@ -213,13 +226,23 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 
 	// Check for suspicious TCP states (connection initiation attempts)
 	if c.Protocol == "tcp" && c.State == "SYN_SENT" && c.RemotePort != 80 && c.RemotePort != 443 {
-		reasons = append(reasons, fmt.Sprintf("TCP_SYN_SENT_%s:%d", c.RemoteIP, c.RemotePort))
+		serviceName := GetServiceName(c.RemotePort)
+		if serviceName != "" {
+			reasons = append(reasons, fmt.Sprintf("TCP_SYN_SENT_%s[%s](%d)", c.RemoteIP, serviceName, c.RemotePort))
+		} else {
+			reasons = append(reasons, fmt.Sprintf("TCP_SYN_SENT_%s:%d", c.RemoteIP, c.RemotePort))
+		}
 	}
 
 	// Check for listening ports (potential backdoors)
 	// Track LISTEN alerts by local port and only alert when the port is not whitelisted.
 	if c.State == "LISTEN" && c.LocalPort > 0 && !m.config.StandardPorts[c.LocalPort] {
-		reasons = append(reasons, fmt.Sprintf("LISTEN_PORT_%d", c.LocalPort))
+		serviceName := GetServiceName(c.LocalPort)
+		if serviceName != "" {
+			reasons = append(reasons, fmt.Sprintf("LISTEN_%s(%d)", serviceName, c.LocalPort))
+		} else {
+			reasons = append(reasons, fmt.Sprintf("LISTEN_PORT_%d", c.LocalPort))
+		}
 	}
 
 	// Check for UDP traffic (often used by malware for C2, DNS tunneling, etc.)
@@ -240,7 +263,12 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 
 	// Check for common RDP/VNC ports
 	if m.config.AnomalousPatterns["ssh"] && (c.RemotePort == 3389 || c.RemotePort == 5900) {
-		reasons = append(reasons, fmt.Sprintf("REMOTE_ACCESS_PORT_%d", c.RemotePort))
+		serviceName := GetServiceName(c.RemotePort)
+		if serviceName != "" {
+			reasons = append(reasons, fmt.Sprintf("REMOTE_ACCESS_%s(%d)", serviceName, c.RemotePort))
+		} else {
+			reasons = append(reasons, fmt.Sprintf("REMOTE_ACCESS_PORT_%d", c.RemotePort))
+		}
 	}
 
 	// Check for private IP connections if enabled
@@ -254,13 +282,23 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	}
 
 	// Check for high ports if enabled (ephemeral range)
-	if m.config.AnomalousPatterns["high_ports"] && c.RemotePort > 49152 {
-		reasons = append(reasons, fmt.Sprintf("HIGH_PORT_%d", c.RemotePort))
+	if m.config.AnomalousPatterns["high_ports"] && c.RemotePort > 49152 && !m.config.IsProcessPortExcluded(c.ProcessName, c.RemotePort) {
+		serviceName := GetServiceName(c.RemotePort)
+		if serviceName != "" {
+			reasons = append(reasons, fmt.Sprintf("HIGH_PORT_%s(%d)", serviceName, c.RemotePort))
+		} else {
+			reasons = append(reasons, fmt.Sprintf("HIGH_PORT_%d", c.RemotePort))
+		}
 	}
 
 	// Check for low/privileged ports if enabled
 	if m.config.AnomalousPatterns["low_ports"] && c.RemotePort > 0 && c.RemotePort < 1024 && c.RemotePort != 80 && c.RemotePort != 443 {
-		reasons = append(reasons, fmt.Sprintf("LOW_PORT_%d", c.RemotePort))
+		serviceName := GetServiceName(c.RemotePort)
+		if serviceName != "" {
+			reasons = append(reasons, fmt.Sprintf("LOW_PORT_%s(%d)", serviceName, c.RemotePort))
+		} else {
+			reasons = append(reasons, fmt.Sprintf("LOW_PORT_%d", c.RemotePort))
+		}
 	}
 
 	// Check for non-standard ports (if not in standard list)

@@ -1,10 +1,13 @@
 package monitor
 
 import (
+	"bufio"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Connection represents a network connection
@@ -102,4 +105,84 @@ func (c *Connection) notificationCooldownKey() string {
 	}
 
 	return c.remoteAddressKey()
+}
+
+// ServiceNameCache caches service name lookups
+var (
+	serviceNameCache = make(map[int]string)
+	serviceNameMutex sync.RWMutex
+	servicesCacheLock sync.Once
+)
+
+// initServiceCache loads /etc/services into memory on first use
+func initServiceCache() {
+	servicesCacheLock.Do(func() {
+		loadServicesFile()
+	})
+}
+
+// loadServicesFile reads /etc/services and caches port to service name mappings
+func loadServicesFile() {
+	file, err := os.Open("/etc/services")
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Skip comments and empty lines
+		if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		// Format: service-name  port/proto  aliases
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+
+		serviceName := fields[0]
+		portProto := strings.Split(fields[1], "/")
+		if len(portProto) < 1 {
+			continue
+		}
+
+		port, err := strconv.Atoi(portProto[0])
+		if err != nil {
+			continue
+		}
+
+		// Only add if not already cached (first occurrence wins)
+		if _, exists := serviceNameCache[port]; !exists {
+			serviceNameCache[port] = serviceName
+		}
+	}
+}
+
+// GetServiceName returns the service name for a port, or empty string if not found
+func GetServiceName(port int) string {
+	initServiceCache()
+
+	serviceNameMutex.RLock()
+	defer serviceNameMutex.RUnlock()
+
+	if name, exists := serviceNameCache[port]; exists {
+		return name
+	}
+	return ""
+}
+
+// FormatPort returns a formatted port string with service name if available
+func FormatPort(port int) string {
+	if port == 0 {
+		return "*"
+	}
+
+	serviceName := GetServiceName(port)
+	if serviceName != "" {
+		return fmt.Sprintf("%s(%d)", serviceName, port)
+	}
+	return strconv.Itoa(port)
 }

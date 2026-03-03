@@ -8,8 +8,20 @@
   ],
   "anomalous_patterns": [
     "ssh",
-    "telnet"
+    "telnet",
+    "high_ports"
   ],
+  "process_port_exclusions": {
+    "chromium": [
+      "49152-65535"
+    ],
+    "chrome": [
+      "49152-65535"
+    ],
+    "forgejo-runner": [
+      "32768-65535"
+    ]
+  },
   "watch_processes": [],
   "verbose": false,
   "alerts_only": true,
@@ -19,7 +31,7 @@
     "notification_cooldown": "24h",
     "listen_notification_cooldown": "0s",
     "title_template": "🚨 Suspicious Connection Detected",
-    "message_template": "Host: {hostname}\nProcess: {service} (PID: {pid})\nRemote IP: {ip}:{port}\nProtocol: {protocol}\nReason: {reason}",
+    "message_template": "Host: {hostname}\nProcess: {service} (PID: {pid})\nProtocol: {protocol}\nReason: {reason}",
     "pushover": {
       "enabled": false,
       "api_key": "your_pushover_api_key",
