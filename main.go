@@ -30,7 +30,7 @@ func main() {
 		flag.VisitAll(func(f *flag.Flag) {
 			// Extract flag name and type
 			name, usage := flag.UnquoteUsage(f)
-			
+
 			// Format the flag line
 			if name == "" {
 				// Boolean flag
@@ -39,10 +39,10 @@ func main() {
 				// Flag with value
 				fmt.Fprintf(os.Stderr, "  --%s %s\n", f.Name, name)
 			}
-			
+
 			// Print usage description with proper indentation
 			fmt.Fprintf(os.Stderr, "        %s", usage)
-			
+
 			// Add default value if not a zero value
 			if f.DefValue != "" && f.DefValue != "false" && f.DefValue != "0" {
 				fmt.Fprintf(os.Stderr, " (default %s)", f.DefValue)
@@ -73,7 +73,7 @@ func main() {
 	// Load configuration
 	config := monitor.DefaultConfig()
 	var actualConfigPath string
-	
+
 	// Auto-load config.json if it exists in the current directory and no config path specified
 	if *configPath == "" {
 		execPath, err := os.Executable()
@@ -115,13 +115,13 @@ func main() {
 			logger.Printf("Warning: Failed to create config file watcher: %v", err)
 		} else {
 			defer watcher.Close()
-			
+
 			err = watcher.Add(actualConfigPath)
 			if err != nil {
 				logger.Printf("Warning: Failed to watch config file: %v", err)
 			} else {
 				logger.Printf("Watching config file for changes: %s", actualConfigPath)
-				
+
 				// Config file change handler
 				go func() {
 					for {
@@ -130,26 +130,26 @@ func main() {
 							if !ok {
 								return
 							}
-							
+
 							// React to write or create events
 							if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) {
 								logger.Printf("Config file changed, reloading: %s", actualConfigPath)
-								
+
 								newConfig := monitor.DefaultConfig()
 								if err := newConfig.LoadFromFile(actualConfigPath); err != nil {
 									logger.Printf("Error reloading config: %v", err)
 									continue
 								}
-								
+
 								// Apply CLI flag overrides
 								newConfig.Verbose = *verbose
 								newConfig.AlertsOnly = *alertOnly
 								newConfig.Interval = *interval
-								
+
 								// Update monitor config
 								m.UpdateConfig(newConfig)
 							}
-							
+
 						case err, ok := <-watcher.Errors:
 							if !ok {
 								return

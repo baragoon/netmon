@@ -41,7 +41,7 @@ type Config struct {
 
 	// Explicit allowlist for remote IPs/CIDRs used to suppress high-port alerts.
 	// Applies in addition to built-in loopback/private/link-local suppression.
-	AllowedRemoteIPs map[string]bool
+	AllowedRemoteIPs   map[string]bool
 	AllowedRemoteCIDRs []*net.IPNet
 
 	// Verbose output
@@ -70,21 +70,21 @@ func DefaultConfig() *Config {
 			53: true,
 		},
 		AnomalousPatterns: map[string]bool{
-			"ssh":         true,  // SSH connections (port 22)
-			"telnet":      true,  // Telnet (port 23)
-			"private_ip":  false, // Connections to private IPs
-			"external":    false, // All external connections
-			"high_ports":  false, // Ports > 49152
-			"low_ports":   false, // Privileged ports < 1024
+			"ssh":        true,  // SSH connections (port 22)
+			"telnet":     true,  // Telnet (port 23)
+			"private_ip": false, // Connections to private IPs
+			"external":   false, // All external connections
+			"high_ports": false, // Ports > 49152
+			"low_ports":  false, // Privileged ports < 1024
 		},
-		WatchProcesses: map[string]bool{},
+		WatchProcesses:        map[string]bool{},
 		ProcessPortExclusions: map[string][]PortRange{},
-		AllowedRemoteIPs: map[string]bool{},
-		AllowedRemoteCIDRs: []*net.IPNet{},
-		Verbose:        false,
-		AlertsOnly:     false,
-		PID:            0,
-		Notifications:  &NotificationConfig{Enabled: false},
+		AllowedRemoteIPs:      map[string]bool{},
+		AllowedRemoteCIDRs:    []*net.IPNet{},
+		Verbose:               false,
+		AlertsOnly:            false,
+		PID:                   0,
+		Notifications:         &NotificationConfig{Enabled: false},
 	}
 }
 
@@ -96,17 +96,17 @@ func (c *Config) LoadFromFile(path string) error {
 	}
 
 	type jsonConfig struct {
-		Interval            string              `json:"interval"`
-		ListenAlertCooldown string              `json:"listen_alert_cooldown"`
-		StandardPorts       []int               `json:"standard_ports"`
-		AnomalousPatterns   []string            `json:"anomalous_patterns"`
-		WatchProcesses      []string            `json:"watch_processes"`
+		Interval              string              `json:"interval"`
+		ListenAlertCooldown   string              `json:"listen_alert_cooldown"`
+		StandardPorts         []int               `json:"standard_ports"`
+		AnomalousPatterns     []string            `json:"anomalous_patterns"`
+		WatchProcesses        []string            `json:"watch_processes"`
 		ProcessPortExclusions map[string][]string `json:"process_port_exclusions"`
-		AllowedRemoteIPs    []string            `json:"allowed_remote_ips"`
-		Verbose             bool                `json:"verbose"`
-		AlertsOnly          bool                `json:"alerts_only"`
-		PID                 int                 `json:"pid"`
-		Notifications       *NotificationConfig `json:"notifications"`
+		AllowedRemoteIPs      []string            `json:"allowed_remote_ips"`
+		Verbose               bool                `json:"verbose"`
+		AlertsOnly            bool                `json:"alerts_only"`
+		PID                   int                 `json:"pid"`
+		Notifications         *NotificationConfig `json:"notifications"`
 	}
 
 	var jc jsonConfig

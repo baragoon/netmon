@@ -13,18 +13,18 @@ import (
 
 // NotificationConfig holds the configuration for all notification providers
 type NotificationConfig struct {
-	Enabled                        bool              `json:"enabled"`
-	NotificationCooldown           time.Duration     `json:"-"` // Internal field, set from NotificationCooldownStr
-	NotificationCooldownStr        string            `json:"notification_cooldown"` // JSON field e.g. "1h", "24h"
-	ListenNotificationCooldown     time.Duration     `json:"-"` // Internal field, set from ListenNotificationCooldownStr
-	ListenNotificationCooldownStr  string            `json:"listen_notification_cooldown"` // LISTEN-specific cooldown; "0s" disables cooldown
-	Pushover                       *PushoverConfig   `json:"pushover,omitempty"`
-	Ntfy                           *NtfyConfig       `json:"ntfy,omitempty"`
-	Pushbullet                     *PushbulletConfig `json:"pushbullet,omitempty"`
-	Telegram                       *TelegramConfig   `json:"telegram,omitempty"`
-	Webhook                        *WebhookConfig    `json:"webhook,omitempty"`
-	TitleTemplate                  string            `json:"title_template"`
-	MessageTemplate                string            `json:"message_template"`
+	Enabled                       bool              `json:"enabled"`
+	NotificationCooldown          time.Duration     `json:"-"`                            // Internal field, set from NotificationCooldownStr
+	NotificationCooldownStr       string            `json:"notification_cooldown"`        // JSON field e.g. "1h", "24h"
+	ListenNotificationCooldown    time.Duration     `json:"-"`                            // Internal field, set from ListenNotificationCooldownStr
+	ListenNotificationCooldownStr string            `json:"listen_notification_cooldown"` // LISTEN-specific cooldown; "0s" disables cooldown
+	Pushover                      *PushoverConfig   `json:"pushover,omitempty"`
+	Ntfy                          *NtfyConfig       `json:"ntfy,omitempty"`
+	Pushbullet                    *PushbulletConfig `json:"pushbullet,omitempty"`
+	Telegram                      *TelegramConfig   `json:"telegram,omitempty"`
+	Webhook                       *WebhookConfig    `json:"webhook,omitempty"`
+	TitleTemplate                 string            `json:"title_template"`
+	MessageTemplate               string            `json:"message_template"`
 }
 
 // PushoverConfig holds Pushover API configuration
@@ -54,16 +54,16 @@ type PushbulletConfig struct {
 
 // TelegramConfig holds Telegram bot configuration
 type TelegramConfig struct {
-	Enabled bool   `json:"enabled"`
+	Enabled  bool   `json:"enabled"`
 	BotToken string `json:"bot_token"`
-	ChatID  string `json:"chat_id"`
+	ChatID   string `json:"chat_id"`
 }
 
 // WebhookConfig holds generic webhook configuration
 type WebhookConfig struct {
-	Enabled bool   `json:"enabled"`
-	URL     string `json:"url"`
-	Method  string `json:"method"`
+	Enabled bool              `json:"enabled"`
+	URL     string            `json:"url"`
+	Method  string            `json:"method"`
 	Headers map[string]string `json:"headers,omitempty"`
 }
 
@@ -186,16 +186,16 @@ func (nm *NotificationManager) SendAlert(conn *Connection) error {
 
 	// Build variable map
 	vars := map[string]string{
-		"hostname":  hostname,
-		"ip":        conn.RemoteIP,
-		"port":      fmt.Sprintf("%d", conn.RemotePort),
-		"service":   conn.ProcessName,
-		"protocol":  conn.Protocol,
-		"local_ip":  conn.LocalIP,
+		"hostname":   hostname,
+		"ip":         conn.RemoteIP,
+		"port":       fmt.Sprintf("%d", conn.RemotePort),
+		"service":    conn.ProcessName,
+		"protocol":   conn.Protocol,
+		"local_ip":   conn.LocalIP,
 		"local_port": fmt.Sprintf("%d", conn.LocalPort),
-		"timestamp": time.Now().Format(time.RFC3339),
-		"reason":    strings.Join(conn.AnomalousReasons, ", "),
-		"pid":       fmt.Sprintf("%d", conn.PID),
+		"timestamp":  time.Now().Format(time.RFC3339),
+		"reason":     strings.Join(conn.AnomalousReasons, ", "),
+		"pid":        fmt.Sprintf("%d", conn.PID),
 	}
 
 	// Format title and message
@@ -498,8 +498,8 @@ func (wn *WebhookNotifier) Send(title, message string) error {
 	}
 
 	data := map[string]string{
-		"title":   title,
-		"message": message,
+		"title":     title,
+		"message":   message,
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
 
