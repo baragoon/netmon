@@ -1,0 +1,77 @@
+{
+  "interval": "5s",
+  "listen_alert_cooldown": "1m",
+  "standard_ports": [
+    80,
+    443,
+    53
+  ],
+  "anomalous_patterns": [
+    "ssh",
+    "telnet",
+    "high_ports"
+  ],
+  "process_port_exclusions": {
+    "chromium": [
+      "49152-65535"
+    ],
+    "chrome": [
+      "49152-65535"
+    ],
+    "forgejo-runner": [
+      "32768-65535"
+    ]
+  },
+  "allowed_remote_ips": [
+    "192.0.2.1",
+    "10.0.0.0/8",
+    "192.168.0.0/16",
+    "172.16.0.0/12",
+    "127.0.0.1",
+    "::1",
+    "fc00::/7",
+    "fe80::/10",
+    "2001:db8::/32"
+  ],
+  "watch_processes": [],
+  "verbose": false,
+  "alerts_only": true,
+  "pid": 0,
+  "notifications": {
+    "enabled": true,
+    "notification_cooldown": "24h",
+    "listen_notification_cooldown": "0s",
+    "title_template": "🚨 Suspicious Connection Detected",
+    "message_template": "Host: {hostname}\nProcess: {service} (PID: {pid})\nProtocol: {protocol}\nReason: {reason}",
+    "pushover": {
+      "enabled": false,
+      "api_key": "your_pushover_api_key",
+      "user_key": "your_pushover_user_key",
+      "device": "",
+      "sound": "incoming"
+    },
+    "ntfy": {
+      "enabled": false,
+      "topic": "netmon-alerts",
+      "base_url": "https://ntfy.sh",
+      "title": "🚨 NetMon Alert"
+    },
+    "pushbullet": {
+      "enabled": false,
+      "api_key": "your_pushbullet_api_key"
+    },
+    "telegram": {
+      "enabled": false,
+      "bot_token": "your_telegram_bot_token",
+      "chat_id": "your_chat_id"
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "https://example.com/webhook",
+      "method": "POST",
+      "headers": {
+        "Authorization": "Bearer your_token"
+      }
+    }
+  }
+}
