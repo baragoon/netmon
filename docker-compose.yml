@@ -10,9 +10,9 @@ services:
     user: "root"
     # Optional: use privileged mode for maximum capabilities
     # privileged: true
-    # Optional: mount config file
-    # volumes:
-    #   - ./config.json:/app/config.json:ro
+    # Mount config file
+    volumes:
+      - ./config.json:/app/config.json:ro
     # Set environment variables if needed
     environment:
       - TZ=Europe/Kyiv
