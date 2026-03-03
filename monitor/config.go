@@ -39,7 +39,7 @@ type Config struct {
 	// Key is lowercase process name, value is list of inclusive ranges.
 	ProcessPortExclusions map[string][]PortRange
 
-	// Explicit allowlist for remote IPs/CIDRs used to suppress high-port alerts.
+	// Explicit allowlist for remote IPs/CIDRs used to suppress outbound alerts.
 	// Applies in addition to built-in loopback/private/link-local suppression.
 	AllowedRemoteIPs   map[string]bool
 	AllowedRemoteCIDRs []*net.IPNet
@@ -303,10 +303,10 @@ func parsePortRangeSpec(spec string) (PortRange, error) {
 	return PortRange{Start: port, End: port}, nil
 }
 
-// IsRemoteIPHighPortExcluded returns true when high-port alerts should be suppressed
+// IsRemoteIPExcluded returns true when outbound alerts should be suppressed
 // for the given remote IP. Built-in exclusions include loopback/private/link-local
 // ranges (IPv4 + IPv6), and custom entries from allowed_remote_ips.
-func (c *Config) IsRemoteIPHighPortExcluded(remoteIP string) bool {
+func (c *Config) IsRemoteIPExcluded(remoteIP string) bool {
 	parsedIP := net.ParseIP(strings.TrimSpace(remoteIP))
 	if parsedIP == nil {
 		return false
@@ -331,4 +331,10 @@ func (c *Config) IsRemoteIPHighPortExcluded(remoteIP string) bool {
 	}
 
 	return false
+}
+
+// IsRemoteIPHighPortExcluded is kept for backward compatibility and delegates
+// to IsRemoteIPExcluded.
+func (c *Config) IsRemoteIPHighPortExcluded(remoteIP string) bool {
+	return c.IsRemoteIPExcluded(remoteIP)
 }

@@ -267,9 +267,10 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	defer m.configMu.RUnlock()
 
 	reasons := []string{}
+	remoteIPExcluded := m.config.IsRemoteIPExcluded(c.RemoteIP)
 
 	// Check for suspicious TCP states (connection initiation attempts)
-	if c.Protocol == "tcp" && c.State == "SYN_SENT" && c.RemotePort != 80 && c.RemotePort != 443 {
+	if !remoteIPExcluded && c.Protocol == "tcp" && c.State == "SYN_SENT" && c.RemotePort != 80 && c.RemotePort != 443 {
 		serviceName := GetServiceName(c.RemotePort)
 		if serviceName != "" {
 			reasons = append(reasons, fmt.Sprintf("TCP_SYN_SENT_%s[%s](%d)", c.RemoteIP, serviceName, c.RemotePort))
@@ -290,23 +291,23 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	}
 
 	// Check for UDP traffic (often used by malware for C2, DNS tunneling, etc.)
-	if c.Protocol == "udp" && c.RemotePort > 0 && c.RemotePort != 53 {
+	if !remoteIPExcluded && c.Protocol == "udp" && c.RemotePort > 0 && c.RemotePort != 53 {
 		// Flag non-DNS UDP traffic
 		reasons = append(reasons, fmt.Sprintf("UDP_TRAFFIC_%s:%d", c.RemoteIP, c.RemotePort))
 	}
 
 	// Check for SSH connections
-	if m.config.AnomalousPatterns["ssh"] && c.RemotePort == 22 {
+	if !remoteIPExcluded && m.config.AnomalousPatterns["ssh"] && c.RemotePort == 22 {
 		reasons = append(reasons, "SSH_OUTBOUND")
 	}
 
 	// Check for Telnet
-	if m.config.AnomalousPatterns["telnet"] && c.RemotePort == 23 {
+	if !remoteIPExcluded && m.config.AnomalousPatterns["telnet"] && c.RemotePort == 23 {
 		reasons = append(reasons, "TELNET_OUTBOUND")
 	}
 
 	// Check for common RDP/VNC ports
-	if m.config.AnomalousPatterns["ssh"] && (c.RemotePort == 3389 || c.RemotePort == 5900) {
+	if !remoteIPExcluded && m.config.AnomalousPatterns["ssh"] && (c.RemotePort == 3389 || c.RemotePort == 5900) {
 		serviceName := GetServiceName(c.RemotePort)
 		if serviceName != "" {
 			reasons = append(reasons, fmt.Sprintf("REMOTE_ACCESS_%s(%d)", serviceName, c.RemotePort))
@@ -316,17 +317,17 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	}
 
 	// Check for private IP connections if enabled
-	if m.config.AnomalousPatterns["private_ip"] && IsPrivateIP(c.RemoteIP) {
+	if !remoteIPExcluded && m.config.AnomalousPatterns["private_ip"] && IsPrivateIP(c.RemoteIP) {
 		reasons = append(reasons, "PRIVATE_IP_CONN")
 	}
 
 	// Check for external connections if enabled
-	if m.config.AnomalousPatterns["external"] && IsPublicIP(c.RemoteIP) {
+	if !remoteIPExcluded && m.config.AnomalousPatterns["external"] && IsPublicIP(c.RemoteIP) {
 		reasons = append(reasons, "EXTERNAL_CONN")
 	}
 
 	// Check for high ports if enabled (ephemeral range)
-	if m.config.AnomalousPatterns["high_ports"] && c.RemotePort > 49152 && !m.config.IsProcessPortExcluded(c.ProcessName, c.RemotePort) && !m.config.IsRemoteIPHighPortExcluded(c.RemoteIP) {
+	if !remoteIPExcluded && m.config.AnomalousPatterns["high_ports"] && c.RemotePort > 49152 && !m.config.IsProcessPortExcluded(c.ProcessName, c.RemotePort) {
 		serviceName := GetServiceName(c.RemotePort)
 		if serviceName != "" {
 			reasons = append(reasons, fmt.Sprintf("HIGH_PORT_%s(%d)", serviceName, c.RemotePort))
@@ -336,7 +337,7 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	}
 
 	// Check for low/privileged ports if enabled
-	if m.config.AnomalousPatterns["low_ports"] && c.RemotePort > 0 && c.RemotePort < 1024 && c.RemotePort != 80 && c.RemotePort != 443 {
+	if !remoteIPExcluded && m.config.AnomalousPatterns["low_ports"] && c.RemotePort > 0 && c.RemotePort < 1024 && c.RemotePort != 80 && c.RemotePort != 443 {
 		serviceName := GetServiceName(c.RemotePort)
 		if serviceName != "" {
 			reasons = append(reasons, fmt.Sprintf("LOW_PORT_%s(%d)", serviceName, c.RemotePort))
