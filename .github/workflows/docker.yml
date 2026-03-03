@@ -97,7 +97,7 @@ jobs:
       # Set up Docker on self-hosted runners
       # https://github.com/docker/setup-docker-action
       - name: Set up Docker
-        uses: docker/setup-docker-action@v3
+        uses: docker/setup-docker-action@v5
 
       # Set up BuildKit Docker container builder to be able to build
       # multi-platform images and export cache
