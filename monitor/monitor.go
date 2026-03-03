@@ -236,7 +236,7 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 
 	// Check for listening ports (potential backdoors)
 	// Track LISTEN alerts by local port and only alert when the port is not whitelisted.
-	if c.State == "LISTEN" && c.LocalPort > 0 && !m.config.StandardPorts[c.LocalPort] {
+	if c.State == "LISTEN" && c.LocalPort > 0 && !m.config.StandardPorts[c.LocalPort] && !m.config.IsProcessPortExcluded(c.ProcessName, c.LocalPort) {
 		serviceName := GetServiceName(c.LocalPort)
 		if serviceName != "" {
 			reasons = append(reasons, fmt.Sprintf("LISTEN_%s(%d)", serviceName, c.LocalPort))
