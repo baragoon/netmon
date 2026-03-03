@@ -81,6 +81,8 @@ docker run --rm --network host netmon --interval 5s --alerts-only
 
 NetMon uses `--network host` mode to monitor the host's network connections from inside the container.
 
+**Editing Config in Docker:** When using Docker Compose, the config file is mounted from `./config.json` on the host. You can edit this file directly on your host machine, and NetMon will automatically reload it inside the container. Changes take effect immediately without restarting the container.
+
 ### Command-line Options
 
 - `--interval`: Monitoring interval (default: 5s)
@@ -118,6 +120,8 @@ Create a JSON config file to customize detection rules:
 `process_port_exclusions` lets you suppress alerts for specific remote ports per process (exact ports like `"443"` or ranges like `"49152-65535"`). This is useful for noisy client apps that use ephemeral ports.
 
 `allowed_remote_ips` suppresses high-port alerts for specific remote IPs/CIDRs. NetMon also suppresses high-port alerts for loopback/private/link-local addresses by default (IPv4 + IPv6).
+
+**Live Config Reload:** NetMon automatically watches the config file for changes and reloads it without requiring a restart. When you edit and save `config.json`, the new settings take effect immediately. This works both when running the binary directly and in Docker containers.
 
 Then run with:
 ```bash
