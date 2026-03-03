@@ -21,13 +21,20 @@ type ConnectionMonitor struct {
 
 // NewConnectionMonitor creates a new monitor
 func NewConnectionMonitor(config *Config, logger *log.Logger) (*ConnectionMonitor, error) {
+	notifier := NewNotificationManager(config.Notifications)
+	if notifier != nil {
+		logger.Printf("Notification manager initialized with %d provider(s)", len(notifier.notifiers))
+	} else if config.Notifications != nil && config.Notifications.Enabled {
+		logger.Printf("Warning: Notifications enabled but no notification manager created")
+	}
+	
 	return &ConnectionMonitor{
 		config:              config,
 		logger:              logger,
 		prevConns:           make(map[string]*Connection),
 		alertHistory:        make(map[string]time.Time),
 		notificationHistory: make(map[string]time.Time),
-		notifier:            NewNotificationManager(config.Notifications),
+		notifier:            notifier,
 	}, nil
 }
 
