@@ -122,10 +122,21 @@ jobs:
         id: docker-tags
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ steps.release-tag.outputs.value }}"
+            # Remove 'v' prefix if present
+            VERSION="${TAG#v}"
+            
+            # Parse major.minor.patch
+            MAJOR=$(echo "$VERSION" | cut -d. -f1)
+            MINOR=$(echo "$VERSION" | cut -d. -f2)
+            PATCH=$(echo "$VERSION" | cut -d. -f3)
+            
             {
               echo "value<<EOF"
               echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-              echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.release-tag.outputs.value }}"
+              echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${MAJOR}.${MINOR}.${PATCH}"
+              echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${MAJOR}.${MINOR}"
+              echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${MAJOR}"
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           else
