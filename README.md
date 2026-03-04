@@ -25,7 +25,7 @@ A simple Linux network connections monitor written in Go to detect abnormal netw
 
 ## Requirements
 
-- Go 1.21 or higher
+- Go 1.24 or higher
 - Linux system (tested on Ubuntu, Debian, CentOS)
 - Root privileges (for full network visibility)
 
