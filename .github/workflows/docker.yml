@@ -135,24 +135,19 @@ jobs:
             exit 1
           fi
 
-          # Configure git to use GPG with passphrase
-          git config gpg.program "$(which gpg)"
-          
-          # Create wrapper script for GPG with passphrase
-          cat > /tmp/gpg-with-passphrase.sh <<'EOF'
-#!/bin/bash
-echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 "$@"
-EOF
+          # Create GPG wrapper script for passphrase injection
+          echo '#!/bin/bash' > /tmp/gpg-with-passphrase.sh
+          echo 'echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 "$@"' >> /tmp/gpg-with-passphrase.sh
           chmod +x /tmp/gpg-with-passphrase.sh
           
-          # Temporarily override GPG program
+          # Configure git to use wrapper
           git config gpg.program /tmp/gpg-with-passphrase.sh
           
           # Create signed tag
           git tag -s "$NEW_TAG" -m "Release $NEW_TAG"
           
-          # Restore original GPG program
-          git config gpg.program "$(which gpg)"
+          # Restore GPG program
+          git config --unset gpg.program
           
           git push origin "$NEW_TAG"
 
