@@ -48,6 +48,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate GPG signing secrets
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Missing required secret: GPG_PRIVATE_KEY"
+            exit 1
+          fi
+          if [ -z "$GPG_PASSPHRASE" ]; then
+            echo "Missing required secret: GPG_PASSPHRASE"
+            exit 1
+          fi
+
+      - name: Import GPG key for release tag signing
+        if: github.event_name == 'workflow_dispatch'
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_tag_gpgsign: true
+
       # Create and push new version tag on manual workflow dispatch
       - name: Create and push version tag
         if: github.event_name == 'workflow_dispatch'
@@ -93,7 +117,7 @@ jobs:
             exit 1
           fi
 
-          git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+          git tag -s "$NEW_TAG" -m "Release $NEW_TAG"
           git push origin "$NEW_TAG"
 
       # Install the cosign tool except on PR
