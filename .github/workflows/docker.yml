@@ -144,9 +144,14 @@ jobs:
             exit 1
           fi
 
+          # Export passphrase for wrapper script
+          export GPG_PASSPHRASE
+          
           # Create GPG wrapper script for passphrase injection
-          echo '#!/bin/bash' > /tmp/gpg-with-passphrase.sh
-          echo 'echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 "$@"' >> /tmp/gpg-with-passphrase.sh
+          cat > /tmp/gpg-with-passphrase.sh <<'WRAPPER_EOF'
+#!/bin/bash
+echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 "$@"
+WRAPPER_EOF
           chmod +x /tmp/gpg-with-passphrase.sh
           
           # Configure git to use wrapper
