@@ -1,5 +1,9 @@
 # Build stage
-FROM golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+
+# Docker buildx automatically provides these
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /build
 
@@ -18,8 +22,8 @@ COPY . .
 # Tidy dependencies
 RUN go mod tidy
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o netmon .
+# Build the application using native cross-compilation (no QEMU needed)
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o netmon .
 
 # Runtime stage
 FROM alpine:3.23
