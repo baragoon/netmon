@@ -156,7 +156,14 @@ func (m *ConnectionMonitor) getConnections() ([]*Connection, error) {
 	}
 
 	// Fallback to net.Connections if per-process method fails
-	conns, err := net.Connections("")
+	// Try both IPv4 and IPv6 for better coverage
+	conns, err := net.Connections("inet")
+	if err != nil {
+		return m.getConnectionsPerProcess()
+	}
+
+	// Also get IPv6 connections for full protocol support
+	conns6, err := net.Connections("inet6")
 	if err != nil {
 		// Final fallback: try per-process again
 		return m.getConnectionsPerProcess()
@@ -179,6 +186,43 @@ func (m *ConnectionMonitor) getConnections() ([]*Connection, error) {
 
 		// Track all TCP states and UDP datagrams
 		// For UDP, status may be empty or "NONE" since it's connectionless
+		state := conn.Status
+		if state == "" {
+			state = "NONE"
+		}
+
+		c := &Connection{
+			PID:         uint32(conn.Pid),
+			ProcessName: procName,
+			LocalIP:     ParseIP(conn.Laddr.IP),
+			LocalPort:   int(conn.Laddr.Port),
+			RemoteIP:    ParseIP(conn.Raddr.IP),
+			RemotePort:  int(conn.Raddr.Port),
+			Protocol:    getProtocolString(conn.Type),
+			State:       state,
+		}
+
+		m.analyzeConnection(c)
+		result = append(result, c)
+	}
+
+	// Process IPv6 connections
+	for _, conn := range conns6 {
+		// Filter by PID if specified
+		m.configMu.RLock()
+		pid := m.config.PID
+		m.configMu.RUnlock()
+
+		if pid != 0 && int(conn.Pid) != pid {
+			continue
+		}
+
+		procName := m.getProcessName(uint32(conn.Pid))
+		if procName == "" {
+			procName = "unknown"
+		}
+
+		// Track all TCP states and UDP datagrams
 		state := conn.Status
 		if state == "" {
 			state = "NONE"
