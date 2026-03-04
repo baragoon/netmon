@@ -101,7 +101,8 @@ Create a JSON config file to customize detection rules:
 {
   "interval": "5s",
   "listen_alert_cooldown": "1m",
-  "standard_ports": [80, 443, 53],
+  "standard_ports_tcp": [80, 443, 53],
+  "standard_ports_udp": [53, 123, 67, 68],
   "anomalous_patterns": ["ssh", "telnet"],
   "process_port_exclusions": {
     "chromium": ["49152-65535"],
@@ -138,6 +139,7 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
 |---------|-------------|---------|
 | `ssh` | Outgoing SSH connections (port 22) | **enabled** |
 | `telnet` | Telnet connections (port 23) | **enabled** |
+| `udp` | Non-standard UDP traffic (excludes standard UDP ports) | disabled |
 | `private_ip` | Connections to private IP ranges (10.x, 192.168.x, 172.16-31.x) | disabled |
 | `external` | All external (public IP) connections | disabled |
 | `high_ports` | Ephemeral port range (49152+) | disabled |
@@ -190,21 +192,31 @@ Note: LISTEN alerts on non-standard ports are still reported, including high por
 
 ## Standard Ports
 
-By default, only these ports are considered "normal":
+NetMon uses separate standard port lists for TCP and UDP protocols:
+
+**Default TCP Ports (standard_ports_tcp):**
 - **80** - HTTP
 - **443** - HTTPS  
 - **53** - DNS
 
-Connections to other ports can be flagged if supported by your anomalous_patterns config. You can customize the standard ports list in your config file:
+**Default UDP Ports (standard_ports_udp):**
+- **53** - DNS
+- **123** - NTP (Network Time Protocol)
+- **67/68** - DHCP (Dynamic Host Configuration Protocol)
+
+You can customize both lists in your config file:
 
 ```json
 {
-  "standard_ports": [80, 443, 53, 3306, 5432, 6379],
-  "anomalous_patterns": ["ssh", "telnet"]
+  "standard_ports_tcp": [80, 443, 53, 3306, 5432],
+  "standard_ports_udp": [53, 123, 67, 68, 51820],
+  "anomalous_patterns": ["ssh", "telnet", "udp"]
 }
 ```
 
-This expands the "safe" ports to include MySQL (3306), PostgreSQL (5432), and Redis (6379).
+This example:
+- Adds MySQL (3306) and PostgreSQL (5432) to standard TCP ports
+- Adds WireGuard (51820) to standard UDP ports to prevent VPN alerts
 
 ## Notifications
 
@@ -460,8 +472,9 @@ UDP is connectionless, so it doesn't have states like TCP. NetMon tracks all act
 - **DNS tunneling**: Malware often uses DNS (port 53) to bypass firewalls
 - **C2 communications**: Command & control servers frequently use UDP
 - **Data exfiltration**: UDP's stateless nature makes it popular for covert channels
+- **VPN/Tunneling**: WireGuard and other VPN protocols use UDP
 
-Alerts trigger for UDP traffic to non-DNS ports, helping catch suspicious UDP-based communications.
+Alerts trigger for UDP traffic to non-standard ports when the `udp` anomalous pattern is enabled. Standard UDP ports (DNS, NTP, DHCP by default) are excluded from alerts. You can customize which UDP ports are considered standard using the `standard_ports_udp` config option.
 
 ## How It Works
 
