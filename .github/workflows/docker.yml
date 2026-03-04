@@ -1,28 +1,12 @@
 ---
 name: Docker
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
 
 on:
   push:
     branches: [ "main" ]
-    # Full publish on version tags
-    tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
-    inputs:
-      version_bump:
-        description: 'Version bump type (major/minor/patch)'
-        required: false
-        default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
 
 env:
   # Use docker.io for Docker Hub if empty
@@ -33,13 +17,10 @@ env:
 
 jobs:
   build:
-
     runs-on: self-hosted
     permissions:
       contents: write
       packages: write
-      # This is used to complete the identity challenge
-      # with sigstore/fulcio when running outside of PRs.
       id-token: write
 
     steps:
@@ -48,126 +29,64 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure GPG for non-interactive signing
+      - name: Compute next release tag
+        id: next-tag
         if: github.event_name == 'workflow_dispatch'
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          if [ -z "$GPG_PRIVATE_KEY" ]; then
-            echo "Missing required secret: GPG_PRIVATE_KEY"
-            exit 1
-          fi
-          if [ -z "$GPG_PASSPHRASE" ]; then
-            echo "Missing required secret: GPG_PASSPHRASE"
-            exit 1
-          fi
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+            let latest = 'v0.0.0';
+            try {
+              const r = await github.rest.repos.getLatestRelease({ owner, repo });
+              latest = r.data.tag_name;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
 
-          # Configure GPG for non-interactive use first
-          mkdir -p ~/.gnupg
-          chmod 700 ~/.gnupg
-          cat > ~/.gnupg/gpg.conf <<EOF
-          use-agent
-          pinentry-mode loopback
-          EOF
-          cat > ~/.gnupg/gpg-agent.conf <<EOF
-          allow-loopback-pinentry
-          default-cache-ttl 21600
-          max-cache-ttl 21600
-          EOF
-          gpgconf --kill gpg-agent 2>/dev/null || true
-          
-          # Import GPG key
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import 2>&1
+            const match = latest.match(/^v(\d+)\.(\d+)\.(\d+)$/);
+            if (!match) {
+              core.setFailed(`Latest release tag has invalid format: ${latest}`);
+              return;
+            }
 
-          # Get key ID from imported keys
-          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format=long | grep sec | head -n1 | awk '{print $2}' | cut -d'/' -f2)
-          
-          if [ -z "$GPG_KEY_ID" ]; then
-            echo "Failed to extract GPG key ID"
-            gpg --list-secret-keys
-            exit 1
-          fi
-          
-          echo "Using GPG key: $GPG_KEY_ID"
+            const major = Number(match[1]);
+            const minor = Number(match[2]);
+            const patch = Number(match[3]) + 1;
+            const next = `v${major}.${minor}.${patch}`;
 
-          # Configure git to use GPG
-          git config user.signingkey "$GPG_KEY_ID"
-          git config commit.gpgsign false
-          git config tag.gpgsign true
-          
-          echo "GPG_KEY_ID=$GPG_KEY_ID" >> $GITHUB_ENV
-          echo "GPG_PASSPHRASE=$GPG_PASSPHRASE" >> $GITHUB_ENV
+            core.setOutput('latest', latest);
+            core.setOutput('next', next);
 
-      # Create and push new version tag on manual workflow dispatch
       - name: Create and push version tag
         if: github.event_name == 'workflow_dispatch'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          NEW_TAG: ${{ steps.next-tag.outputs.next }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Get latest tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          
-          # Parse version
-          VERSION=${LATEST_TAG#v}
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
-          
-          # Bump version based on input
-          case "${{ inputs.version_bump }}" in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-          
-          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
           echo "Creating new tag: $NEW_TAG"
-
-          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
-            echo "Tag already exists locally: $NEW_TAG"
-            exit 1
-          fi
 
           if git ls-remote --exit-code --tags origin "refs/tags/$NEW_TAG" >/dev/null 2>&1; then
             echo "Tag already exists on origin: $NEW_TAG"
             exit 1
           fi
 
-          # Create GPG wrapper script with embedded passphrase
-          {
-            echo '#!/bin/bash'
-            echo "GPG_PASS='$GPG_PASSPHRASE'"
-            echo 'echo "$GPG_PASS" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 "$@"'
-          } > /tmp/gpg-with-passphrase.sh
-          chmod +x /tmp/gpg-with-passphrase.sh
-          
-          # Configure git to use wrapper
-          git config gpg.program /tmp/gpg-with-passphrase.sh
-          
-          # Create signed tag
-          git tag -s "$NEW_TAG" -m "Release $NEW_TAG"
-          
-          # Restore GPG program
-          git config --unset gpg.program
-          
+          git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
           git push origin "$NEW_TAG"
 
-      # Install the cosign tool except on PR
-      # https://github.com/sigstore/cosign-installer
+      - name: Set release tag output
+        id: release-tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ steps.next-tag.outputs.next }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install cosign
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'workflow_dispatch'
         uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
         with:
           cosign-release: 'v2.2.4'
@@ -185,89 +104,79 @@ jobs:
 
           docker info
 
-      # Set up BuildKit Docker container builder to be able to build
-      # multi-platform images and export cache
-      # https://github.com/docker/setup-qemu-action
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      # https://github.com/docker/setup-buildx-action
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
-      # Login against a Docker registry except on PR
-      # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
+        if: github.event_name == 'workflow_dispatch'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Extract metadata (tags, labels) for Docker
-      # https://github.com/docker/metadata-action
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern=v{{version}}
-            type=semver,pattern=v{{major}}.{{minor}}
-            type=ref,event=pr
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Prepare Docker tags
+        id: docker-tags
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            {
+              echo "value<<EOF"
+              echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+              echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.release-tag.outputs.value }}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "value<<EOF"
+              echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.sha }}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
 
-      # Build and push Docker image with Buildx (don't push on PR)
-      # https://github.com/docker/build-push-action
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           platforms: linux/amd64,linux/arm/v7,linux/arm64/v8
-          push: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: ${{ github.event_name == 'workflow_dispatch' }}
+          tags: ${{ steps.docker-tags.outputs.value }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
 
-      # Sign the resulting Docker image digest except on PRs.
-      # This will only write to the public Rekor transparency log when the Docker
-      # repository is public to avoid leaking data.  If you would like to publish
-      # transparency data even for private images, pass --force to cosign below.
-      # https://github.com/sigstore/cosign
       - name: Sign the published Docker image
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
+        if: github.event_name == 'workflow_dispatch'
         env:
-          # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
-          TAGS: ${{ steps.meta.outputs.tags }}
+          TAGS: ${{ steps.docker-tags.outputs.value }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        # This step uses the identity token to provision an ephemeral certificate
-        # against the sigstore community Fulcio instance.
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
-      # Create GitHub release for version tags
+
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          tag_name: ${{ steps.release-tag.outputs.value }}
+          release_name: Release ${{ steps.release-tag.outputs.value }}
           body: |
             ## Docker Images
             
             ```bash
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.release-tag.outputs.value }}
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ```
             
             ## Image Details
             - **Digest**: `${{ steps.build-and-push.outputs.digest }}`
-            - **Tags**: 
+            - **Tags**:
             ```
-            ${{ steps.meta.outputs.tags }}
+            ${{ steps.docker-tags.outputs.value }}
             ```
           draft: false
           prerelease: false
