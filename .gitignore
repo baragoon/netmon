@@ -1,2 +1,4 @@
 netmon
 config.json
+ci-signing-private.asc
+ci-signing-public.asc
