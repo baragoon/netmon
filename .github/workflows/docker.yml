@@ -48,7 +48,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate GPG signing secrets
+      - name: Configure GPG for non-interactive signing
         if: github.event_name == 'workflow_dispatch'
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -63,14 +63,32 @@ jobs:
             exit 1
           fi
 
-      - name: Import GPG key for release tag signing
-        if: github.event_name == 'workflow_dispatch'
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          git_user_signingkey: true
-          git_tag_gpgsign: true
+          # Import GPG key
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+
+          # Get key ID
+          GPG_KEY_ID=$(echo "$GPG_PRIVATE_KEY" | gpg --list-packets | grep keyid | head -n 1 | sed 's/.*keyid //; s/ .*//')
+
+          # Configure git to use GPG
+          git config user.signingkey "$GPG_KEY_ID"
+          git config commit.gpgsign false
+          git config tag.gpgsign true
+
+          # Configure GPG for non-interactive use
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent || true
+          
+          # Test signing with passphrase
+          echo "test" | gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --clearsign --default-key "$GPG_KEY_ID" >/dev/null 2>&1 || {
+            echo "GPG signing test failed"
+            exit 1
+          }
+          
+          echo "GPG_KEY_ID=$GPG_KEY_ID" >> $GITHUB_ENV
+          echo "GPG_PASSPHRASE=$GPG_PASSPHRASE" >> $GITHUB_ENV
 
       # Create and push new version tag on manual workflow dispatch
       - name: Create and push version tag
@@ -117,7 +135,25 @@ jobs:
             exit 1
           fi
 
+          # Configure git to use GPG with passphrase
+          git config gpg.program "$(which gpg)"
+          
+          # Create wrapper script for GPG with passphrase
+          cat > /tmp/gpg-with-passphrase.sh <<'EOF'
+#!/bin/bash
+echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 "$@"
+EOF
+          chmod +x /tmp/gpg-with-passphrase.sh
+          
+          # Temporarily override GPG program
+          git config gpg.program /tmp/gpg-with-passphrase.sh
+          
+          # Create signed tag
           git tag -s "$NEW_TAG" -m "Release $NEW_TAG"
+          
+          # Restore original GPG program
+          git config gpg.program "$(which gpg)"
+          
           git push origin "$NEW_TAG"
 
       # Install the cosign tool except on PR
