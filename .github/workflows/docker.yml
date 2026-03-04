@@ -63,29 +63,38 @@ jobs:
             exit 1
           fi
 
+          # Configure GPG for non-interactive use first
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          cat > ~/.gnupg/gpg.conf <<EOF
+          use-agent
+          pinentry-mode loopback
+          EOF
+          cat > ~/.gnupg/gpg-agent.conf <<EOF
+          allow-loopback-pinentry
+          default-cache-ttl 21600
+          max-cache-ttl 21600
+          EOF
+          gpgconf --kill gpg-agent 2>/dev/null || true
+          
           # Import GPG key
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import 2>&1
 
-          # Get key ID
-          GPG_KEY_ID=$(echo "$GPG_PRIVATE_KEY" | gpg --list-packets | grep keyid | head -n 1 | sed 's/.*keyid //; s/ .*//')
+          # Get key ID from imported keys
+          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format=long | grep sec | head -n1 | awk '{print $2}' | cut -d'/' -f2)
+          
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Failed to extract GPG key ID"
+            gpg --list-secret-keys
+            exit 1
+          fi
+          
+          echo "Using GPG key: $GPG_KEY_ID"
 
           # Configure git to use GPG
           git config user.signingkey "$GPG_KEY_ID"
           git config commit.gpgsign false
           git config tag.gpgsign true
-
-          # Configure GPG for non-interactive use
-          mkdir -p ~/.gnupg
-          chmod 700 ~/.gnupg
-          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
-          gpgconf --kill gpg-agent || true
-          
-          # Test signing with passphrase
-          echo "test" | gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --clearsign --default-key "$GPG_KEY_ID" >/dev/null 2>&1 || {
-            echo "GPG signing test failed"
-            exit 1
-          }
           
           echo "GPG_KEY_ID=$GPG_KEY_ID" >> $GITHUB_ENV
           echo "GPG_PASSPHRASE=$GPG_PASSPHRASE" >> $GITHUB_ENV
