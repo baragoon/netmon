@@ -156,7 +156,7 @@ func (m *ConnectionMonitor) getConnections() ([]*Connection, error) {
 	}
 
 	// Fallback to net.Connections if per-process method fails
-	conns, err := net.Connections("inet")
+	conns, err := net.Connections("")
 	if err != nil {
 		// Final fallback: try per-process again
 		return m.getConnectionsPerProcess()
@@ -281,7 +281,13 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 
 	// Check for listening ports (potential backdoors)
 	// Track LISTEN alerts by local port and only alert when the port is not whitelisted.
-	if c.State == "LISTEN" && c.LocalPort > 0 && !m.config.StandardPorts[c.LocalPort] && !m.config.IsProcessPortExcluded(c.ProcessName, c.LocalPort) {
+	var standardPorts map[int]bool
+	if c.Protocol == "tcp" {
+		standardPorts = m.config.StandardPortsTCP
+	} else if c.Protocol == "udp" {
+		standardPorts = m.config.StandardPortsUDP
+	}
+	if c.State == "LISTEN" && c.LocalPort > 0 && !standardPorts[c.LocalPort] && !m.config.IsProcessPortExcluded(c.ProcessName, c.LocalPort) {
 		serviceName := GetServiceName(c.LocalPort)
 		if serviceName != "" {
 			reasons = append(reasons, fmt.Sprintf("LISTEN_%s(%d)", serviceName, c.LocalPort))
@@ -291,8 +297,8 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	}
 
 	// Check for UDP traffic (often used by malware for C2, DNS tunneling, etc.)
-	if !remoteIPExcluded && c.Protocol == "udp" && c.RemotePort > 0 && c.RemotePort != 53 {
-		// Flag non-DNS UDP traffic
+	if !remoteIPExcluded && m.config.AnomalousPatterns["udp"] && c.Protocol == "udp" && c.RemotePort > 0 && !m.config.StandardPortsUDP[c.RemotePort] {
+		// Flag non-standard UDP traffic
 		reasons = append(reasons, fmt.Sprintf("UDP_TRAFFIC_%s:%d", c.RemoteIP, c.RemotePort))
 	}
 
@@ -347,7 +353,11 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	}
 
 	// Check for non-standard ports (if not in standard list)
-	if !m.config.StandardPorts[c.RemotePort] && c.RemotePort > 1024 && !m.config.AnomalousPatterns["high_ports"] {
+	standardPorts = m.config.StandardPortsTCP
+	if c.Protocol == "udp" {
+		standardPorts = m.config.StandardPortsUDP
+	}
+	if !standardPorts[c.RemotePort] && c.RemotePort > 1024 && !m.config.AnomalousPatterns["high_ports"] {
 		// Only flag unusual ports that aren't in our standard list
 		if c.RemotePort > 5000 && c.RemotePort < 49152 {
 			// Might be a custom service

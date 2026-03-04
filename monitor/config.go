@@ -25,8 +25,11 @@ type Config struct {
 	// Rate limit for LISTEN alerts in logs (default: 1m)
 	ListenAlertCooldown time.Duration
 
-	// Ports to watch for (non-standard)
-	StandardPorts map[int]bool
+	// TCP ports considered standard (won't alert on LISTEN)
+	StandardPortsTCP map[int]bool
+
+	// UDP ports considered standard (won't alert on LISTEN/traffic)
+	StandardPortsUDP map[int]bool
 
 	// Anomalous patterns to alert on
 	AnomalousPatterns map[string]bool
@@ -62,16 +65,26 @@ func DefaultConfig() *Config {
 	return &Config{
 		Interval:            5 * time.Second,
 		ListenAlertCooldown: 1 * time.Minute,
-		StandardPorts: map[int]bool{
+		StandardPortsTCP: map[int]bool{
 			// HTTP/HTTPS
 			80:  true,
 			443: true,
 			// DNS
 			53: true,
 		},
+		StandardPortsUDP: map[int]bool{
+			// DNS
+			53: true,
+			// NTP
+			123: true,
+			// DHCP
+			67: true,
+			68: true,
+		},
 		AnomalousPatterns: map[string]bool{
 			"ssh":        true,  // SSH connections (port 22)
 			"telnet":     true,  // Telnet (port 23)
+			"udp":        false, // Non-DNS UDP traffic
 			"private_ip": false, // Connections to private IPs
 			"external":   false, // All external connections
 			"high_ports": false, // Ports > 49152
@@ -98,7 +111,8 @@ func (c *Config) LoadFromFile(path string) error {
 	type jsonConfig struct {
 		Interval              string              `json:"interval"`
 		ListenAlertCooldown   string              `json:"listen_alert_cooldown"`
-		StandardPorts         []int               `json:"standard_ports"`
+		StandardPortsTCP      []int               `json:"standard_ports_tcp"`
+		StandardPortsUDP      []int               `json:"standard_ports_udp"`
 		AnomalousPatterns     []string            `json:"anomalous_patterns"`
 		WatchProcesses        []string            `json:"watch_processes"`
 		ProcessPortExclusions map[string][]string `json:"process_port_exclusions"`
@@ -126,10 +140,17 @@ func (c *Config) LoadFromFile(path string) error {
 		}
 	}
 
-	if len(jc.StandardPorts) > 0 {
-		c.StandardPorts = make(map[int]bool)
-		for _, p := range jc.StandardPorts {
-			c.StandardPorts[p] = true
+	if len(jc.StandardPortsTCP) > 0 {
+		c.StandardPortsTCP = make(map[int]bool)
+		for _, p := range jc.StandardPortsTCP {
+			c.StandardPortsTCP[p] = true
+		}
+	}
+
+	if len(jc.StandardPortsUDP) > 0 {
+		c.StandardPortsUDP = make(map[int]bool)
+		for _, p := range jc.StandardPortsUDP {
+			c.StandardPortsUDP[p] = true
 		}
 	}
 
