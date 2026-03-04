@@ -82,8 +82,18 @@ jobs:
           
           NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
           echo "Creating new tag: $NEW_TAG"
-          
-          git tag "$NEW_TAG"
+
+          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
+            echo "Tag already exists locally: $NEW_TAG"
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$NEW_TAG" >/dev/null 2>&1; then
+            echo "Tag already exists on origin: $NEW_TAG"
+            exit 1
+          fi
+
+          git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
           git push origin "$NEW_TAG"
 
       # Install the cosign tool except on PR
