@@ -326,19 +326,20 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	// Check for listening ports (potential backdoors)
 	// Track LISTEN alerts by local port and only alert when the port is not whitelisted.
 	var standardPorts map[int]bool
-	if c.Protocol == "tcp" {
+	switch c.Protocol {
+	case "tcp":
 		standardPorts = m.config.StandardPortsTCP
-	} else if c.Protocol == "udp" {
+	case "udp":
 		standardPorts = m.config.StandardPortsUDP
 	}
-	
+
 	// For TCP, check State == "LISTEN"
 	// For UDP, also check for bound sockets with no remote endpoint (NONE state), which indicates listening
 	isListening := c.State == "LISTEN"
 	if c.Protocol == "udp" && !isListening {
 		isListening = (c.State == "NONE" || c.State == "") && c.LocalPort > 0 && c.RemotePort == 0 && (c.RemoteIP == "" || c.RemoteIP == "0.0.0.0" || c.RemoteIP == "::")
 	}
-	
+
 	if isListening && c.LocalPort > 0 && !standardPorts[c.LocalPort] && !m.config.IsProcessPortExcluded(c.ProcessName, c.LocalPort) {
 		serviceName := GetServiceName(c.LocalPort)
 		if serviceName != "" {
