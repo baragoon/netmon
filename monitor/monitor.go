@@ -92,7 +92,7 @@ func (m *ConnectionMonitor) checkConnections() {
 	for _, conn := range connections {
 		// Skip duplicate LISTEN on same port for IPv4/IPv6
 		// Report only the first one seen (typically IPv4)
-		if conn.State == "LISTEN" && conn.LocalPort > 0 {
+		if isSocketListening(conn) && conn.LocalPort > 0 {
 			if seenListenPorts[conn.LocalPort] {
 				// Already reported this LISTEN port, skip the duplicate (IPv6 variant)
 				continue
@@ -326,12 +326,17 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	// Check for listening ports (potential backdoors)
 	// Track LISTEN alerts by local port and only alert when the port is not whitelisted.
 	var standardPorts map[int]bool
-	if c.Protocol == "tcp" {
+	switch c.Protocol {
+	case "tcp":
 		standardPorts = m.config.StandardPortsTCP
-	} else if c.Protocol == "udp" {
+	case "udp":
 		standardPorts = m.config.StandardPortsUDP
 	}
-	if c.State == "LISTEN" && c.LocalPort > 0 && !standardPorts[c.LocalPort] && !m.config.IsProcessPortExcluded(c.ProcessName, c.LocalPort) {
+
+	// Check if socket is listening (works for both TCP LISTEN and UDP bound sockets)
+	isListening := isSocketListening(c)
+
+	if isListening && c.LocalPort > 0 && !standardPorts[c.LocalPort] && !m.config.IsProcessPortExcluded(c.ProcessName, c.LocalPort) {
 		serviceName := GetServiceName(c.LocalPort)
 		if serviceName != "" {
 			reasons = append(reasons, fmt.Sprintf("LISTEN_%s(%d)", serviceName, c.LocalPort))
@@ -415,6 +420,21 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	}
 }
 
+// isSocketListening checks if a socket is listening for both TCP and UDP protocols.
+// For TCP, a listening socket has State == "LISTEN".
+// For UDP, a listening socket is bound locally with no remote endpoint:
+// State is "NONE" or empty, LocalPort > 0, RemotePort == 0,
+// and RemoteIP is empty, "0.0.0.0", or "::"
+func isSocketListening(c *Connection) bool {
+	if c.State == "LISTEN" {
+		return true
+	}
+	if c.Protocol == "udp" && (c.State == "NONE" || c.State == "") && c.LocalPort > 0 && c.RemotePort == 0 && (c.RemoteIP == "" || c.RemoteIP == "0.0.0.0" || c.RemoteIP == "::") {
+		return true
+	}
+	return false
+}
+
 // alertOnAnomaly logs an alert for anomalous activity
 func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 	key := c.connectionKey()
@@ -422,7 +442,7 @@ func (m *ConnectionMonitor) alertOnAnomaly(c *Connection) {
 
 	m.configMu.RLock()
 	alertCooldown := 1 * time.Minute
-	if c.State == "LISTEN" && m.config != nil && m.config.ListenAlertCooldown > 0 {
+	if isSocketListening(c) && m.config != nil && m.config.ListenAlertCooldown > 0 {
 		alertCooldown = m.config.ListenAlertCooldown
 	}
 	notifier := m.notifier

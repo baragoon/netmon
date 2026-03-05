@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+reviews:
+  tools:
+    golangci-lint:
+      enabled: true
+      config_file: .golangci-lint.yml
+  path_filters:
+    - "**/*.go"
+    - "go.mod"
+    - "go.sum"
+    - "!.git/**"
+    - "!netmon"
