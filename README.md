@@ -466,7 +466,7 @@ All enabled providers will receive alerts simultaneously.
 
 ## Example Output
 
-```
+```text
 [netmon] 2026/02/25 10:30:45 monitor.go:35: Starting network connections monitor (interval: 5s)
 [netmon] 2026/02/25 10:30:45 monitor.go:36: Watching for abnormal activity: map[ssh:true telnet:true]
 [netmon] 2026/02/25 10:30:50 monitor.go:91: NEW: curl (1234) -> 203.0.113.42:443 [tcp ESTABLISHED]
