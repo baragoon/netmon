@@ -151,7 +151,7 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
 ### Available Patterns
 
 | Pattern | Description | Default |
-|---------|-------------|---------|
+| --- | --- | --- |
 | `ssh` | Outgoing SSH connections (port 22) | **enabled** |
 | `telnet` | Telnet connections (port 23) | **enabled** |
 | `udp` | Non-standard UDP traffic (excludes standard UDP ports) | disabled |
@@ -306,7 +306,7 @@ This prevents notification flooding while maintaining comprehensive logs for for
 Use dynamic variables in alert titles and messages to customize notifications:
 
 | Variable | Description | Example |
-|----------|-------------|---------|
+| --- | --- | --- |
 | `{hostname}` | Server hostname | server-1, web-prod-01 |
 | `{ip}` | Remote IP address | 203.0.113.42 |
 | `{port}` | Remote port number | 22 |
