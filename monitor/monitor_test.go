@@ -315,6 +315,44 @@ func TestAnalyzeConnection_ListenPorts(t *testing.T) {
 			},
 			expectAnomaly: false,
 		},
+		{
+			name: "UDP LISTEN on non-standard port with NONE state (WireGuard case)",
+			conn: &Connection{
+				ProcessName: "wg-quick",
+				Protocol:    "udp",
+				LocalPort:   14996,
+				RemotePort:  0,
+				RemoteIP:    "",
+				State:       "NONE",
+			},
+			expectAnomaly: true,
+			expectReason:  "LISTEN",
+		},
+		{
+			name: "UDP LISTEN on non-standard port with empty state",
+			conn: &Connection{
+				ProcessName: "custom_app",
+				Protocol:    "udp",
+				LocalPort:   18888,
+				RemotePort:  0,
+				RemoteIP:    "0.0.0.0",
+				State:       "",
+			},
+			expectAnomaly: true,
+			expectReason:  "LISTEN",
+		},
+		{
+			name: "UDP LISTEN on standard port 53 with NONE state (should not alert)",
+			conn: &Connection{
+				ProcessName: "systemd-resolved",
+				Protocol:    "udp",
+				LocalPort:   53,
+				RemotePort:  0,
+				RemoteIP:    "::",
+				State:       "NONE",
+			},
+			expectAnomaly: false,
+		},
 	}
 
 	for _, tt := range tests {

@@ -331,7 +331,15 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	} else if c.Protocol == "udp" {
 		standardPorts = m.config.StandardPortsUDP
 	}
-	if c.State == "LISTEN" && c.LocalPort > 0 && !standardPorts[c.LocalPort] && !m.config.IsProcessPortExcluded(c.ProcessName, c.LocalPort) {
+	
+	// For TCP, check State == "LISTEN"
+	// For UDP, also check for bound sockets with no remote endpoint (NONE state), which indicates listening
+	isListening := c.State == "LISTEN"
+	if c.Protocol == "udp" && !isListening {
+		isListening = (c.State == "NONE" || c.State == "") && c.LocalPort > 0 && c.RemotePort == 0 && (c.RemoteIP == "" || c.RemoteIP == "0.0.0.0" || c.RemoteIP == "::")
+	}
+	
+	if isListening && c.LocalPort > 0 && !standardPorts[c.LocalPort] && !m.config.IsProcessPortExcluded(c.ProcessName, c.LocalPort) {
 		serviceName := GetServiceName(c.LocalPort)
 		if serviceName != "" {
 			reasons = append(reasons, fmt.Sprintf("LISTEN_%s(%d)", serviceName, c.LocalPort))
