@@ -83,6 +83,20 @@ NetMon uses `--network host` mode to monitor the host's network connections from
 
 **Editing Config in Docker:** When using Docker Compose, the config file is mounted from `./config.json` on the host. You can edit this file directly on your host machine, and NetMon will automatically reload it inside the container. Changes take effect immediately without restarting the container.
 
+### Self-hosted GitHub Actions Runner (Docker)
+
+If you run the Docker workflow on a `self-hosted` GitHub Actions runner, Docker must already be available to the runner user.
+
+- Linux runner:
+  - Ensure the Docker daemon is running.
+  - Ensure the runner user is in the `docker` group.
+  - Example host setup: `sudo usermod -aG docker <runner-user>` and then restart the runner session/service.
+- macOS runner:
+  - Ensure Docker Desktop is running.
+  - Ensure the runner process is started under the same account that can access Docker Desktop.
+
+The workflow does not attempt to change `/var/run/docker.sock` permissions at runtime.
+
 ### Command-line Options
 
 - `--interval`: Monitoring interval (default: 5s)
@@ -125,6 +139,7 @@ Create a JSON config file to customize detection rules:
 **Live Config Reload:** NetMon automatically watches the config file for changes and reloads it without requiring a restart. When you edit and save `config.json`, the new settings take effect immediately. This works both when running the binary directly and in Docker containers.
 
 Then run with:
+
 ```bash
 sudo ./netmon --config /path/to/config.json
 ```
@@ -148,6 +163,7 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
 ### Configuration Examples
 
 **Alert only on SSH and Telnet (default):**
+
 ```json
 {
   "anomalous_patterns": ["ssh", "telnet"]
@@ -155,6 +171,7 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
 ```
 
 **Alert on all remote access attempts:**
+
 ```json
 {
   "anomalous_patterns": ["ssh", "telnet", "private_ip"]
@@ -162,6 +179,7 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
 ```
 
 **Monitor for suspicious data exfiltration (external + high ports):**
+
 ```json
 {
   "anomalous_patterns": ["external", "high_ports"]
@@ -169,6 +187,7 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
 ```
 
 **Reduce high-port noise for specific apps (balanced):**
+
 ```json
 {
   "anomalous_patterns": ["ssh", "telnet", "high_ports"],
@@ -184,6 +203,7 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
 Note: LISTEN alerts on non-standard ports are still reported, including high ports.
 
 **Custom strict monitoring (all patterns enabled):**
+
 ```json
 {
   "anomalous_patterns": ["ssh", "telnet", "private_ip", "external", "high_ports", "low_ports"]
@@ -195,11 +215,13 @@ Note: LISTEN alerts on non-standard ports are still reported, including high por
 NetMon uses separate standard port lists for TCP and UDP protocols:
 
 **Default TCP Ports (standard_ports_tcp):**
+
 - **80** - HTTP
 - **443** - HTTPS  
 - **53** - DNS
 
 **Default UDP Ports (standard_ports_udp):**
+
 - **53** - DNS
 - **123** - NTP (Network Time Protocol)
 - **67/68** - DHCP (Dynamic Host Configuration Protocol)
@@ -215,6 +237,7 @@ You can customize both lists in your config file:
 ```
 
 This example:
+
 - Adds MySQL (3306) and PostgreSQL (5432) to standard TCP ports
 - Adds WireGuard (51820) to standard UDP ports to prevent VPN alerts
 
@@ -247,6 +270,7 @@ Default cooldown is **24 hours**, but you can customize it:
 ```
 
 **Cooldown Examples:**
+
 - `"1h"` - Notify once per hour per address
 - `"2h"` - Notify once every 2 hours
 - `"24h"` - Notify once per day (default)
@@ -254,6 +278,7 @@ Default cooldown is **24 hours**, but you can customize it:
 - `"30m"` - Notify once every 30 minutes
 
 **LISTEN Notification Cooldown:**
+
 - `listen_notification_cooldown` applies only to LISTEN alerts on `0.0.0.0` / `::`.
 - Default is `"0s"` (disabled), meaning those LISTEN notifications are sent immediately.
 - Set a value like `"30s"` or `"2m"` to deduplicate per LISTEN port during that window.
@@ -261,6 +286,7 @@ Default cooldown is **24 hours**, but you can customize it:
 **Example Behavior** (with `notification_cooldown: "2h"`):
 
 If malware at `203.0.113.42:8080` is detected:
+
 - First detection (00:00): Alert logged + notification sent ✉️
 - Subsequent detections (00:05, 00:30): Alerts logged only, no notification
 - Detection at 02:01 (>2h later): Alert logged + notification sent again ✉️
@@ -294,7 +320,7 @@ Use dynamic variables in alert titles and messages to customize notifications:
 
 ### Pushover Setup
 
-1. Create account at https://pushover.net
+1. Create account at <https://pushover.net>
 2. Create application and get API key
 3. Get your user key
 4. Configure in config.json:
@@ -339,7 +365,7 @@ Then subscribe to alerts at: `https://ntfy.sh/my-netmon-alerts`
 
 ### Pushbullet Setup
 
-1. Get API key from https://www.pushbullet.com/account/settings
+1. Get API key from <https://www.pushbullet.com/account/settings>
 2. Configure:
 
 ```json
@@ -400,6 +426,7 @@ Send alerts to any HTTP endpoint:
 ```
 
 Webhook receives JSON payload:
+
 ```json
 {
   "title": "🚨 Suspicious Network Activity",
@@ -462,6 +489,7 @@ NetMon monitors **all TCP connection states** and **UDP datagrams**, not just es
 ### Why Track All States?
 
 Monitoring only ESTABLISHED connections misses critical security events:
+
 - **Malware starting sessions**: SYN_SENT states reveal connection attempts before they succeed
 - **Backdoor services**: LISTEN states expose unauthorized services waiting for commands
 - **Port scanning**: SYN_RECV patterns indicate reconnaissance activity
@@ -469,6 +497,7 @@ Monitoring only ESTABLISHED connections misses critical security events:
 ### UDP Monitoring
 
 UDP is connectionless, so it doesn't have states like TCP. NetMon tracks all active UDP datagrams because:
+
 - **DNS tunneling**: Malware often uses DNS (port 53) to bypass firewalls
 - **C2 communications**: Command & control servers frequently use UDP
 - **Data exfiltration**: UDP's stateless nature makes it popular for covert channels
@@ -507,19 +536,25 @@ Alerts trigger for UDP traffic to non-standard ports when the `udp` anomalous pa
 ## Troubleshooting
 
 ### "Permission denied" errors
+
 This tool requires root privileges:
+
 ```bash
 sudo ./netmon
 ```
 
 ### Missing connections on some systems
+
 Some Linux distributions require additional capabilities:
+
 ```bash
 sudo setcap cap_net_admin,cap_sys_chroot,cap_dac_override=ep ./netmon
 ```
 
 ### High resource usage
+
 Increase the monitoring interval:
+
 ```bash
 sudo ./netmon --interval 30s
 ```
