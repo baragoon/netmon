@@ -336,7 +336,11 @@ func (m *ConnectionMonitor) analyzeConnection(c *Connection) {
 	// Check if socket is listening (works for both TCP LISTEN and UDP bound sockets)
 	isListening := isSocketListening(c)
 
-	if isListening && c.LocalPort > 0 && !standardPorts[c.LocalPort] && !m.config.IsProcessPortExcluded(c.ProcessName, c.LocalPort) {
+	// For UDP, only detect listening ports if UDP pattern is enabled
+	// For TCP, always detect listening ports
+	shouldDetectListen := c.Protocol != "udp" || m.config.AnomalousPatterns["udp"]
+
+	if isListening && c.LocalPort > 0 && !standardPorts[c.LocalPort] && !m.config.IsProcessPortExcluded(c.ProcessName, c.LocalPort) && shouldDetectListen {
 		serviceName := GetServiceName(c.LocalPort)
 		if serviceName != "" {
 			reasons = append(reasons, fmt.Sprintf("LISTEN_%s(%d)", serviceName, c.LocalPort))

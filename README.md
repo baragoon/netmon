@@ -154,7 +154,7 @@ Each pattern controls what types of connections trigger alerts. Enable patterns 
 | --- | --- | --- |
 | `ssh` | Outgoing SSH connections (port 22) | **enabled** |
 | `telnet` | Telnet connections (port 23) | **enabled** |
-| `udp` | Non-standard UDP traffic (excludes standard UDP ports) | disabled |
+| `udp` | Non-standard UDP traffic and listening ports (excludes standard UDP ports) | disabled |
 | `private_ip` | Connections to private IP ranges (10.x, 192.168.x, 172.16-31.x) | disabled |
 | `external` | All external (public IP) connections | disabled |
 | `high_ports` | Ephemeral port range (49152+) | disabled |
@@ -503,7 +503,33 @@ UDP is connectionless, so it doesn't have states like TCP. NetMon tracks all act
 - **Data exfiltration**: UDP's stateless nature makes it popular for covert channels
 - **VPN/Tunneling**: WireGuard and other VPN protocols use UDP
 
-Alerts trigger for UDP traffic to non-standard ports when the `udp` anomalous pattern is enabled. Standard UDP ports (DNS, NTP, DHCP by default) are excluded from alerts. You can customize which UDP ports are considered standard using the `standard_ports_udp` config option.
+When the `udp` anomalous pattern is **enabled**, NetMon will detect:
+
+- UDP listening ports (like WireGuard servers on port 51820 or custom ports)
+- Outbound UDP traffic to non-standard ports
+
+Standard UDP ports (DNS, NTP, DHCP by default) are excluded from alerts. You can customize which UDP ports are considered standard using the `standard_ports_udp` config option.
+
+**Example: Detecting WireGuard VPN**
+
+To detect WireGuard or other VPN services using UDP:
+
+```json
+{
+  "anomalous_patterns": ["ssh", "telnet", "udp"]
+}
+```
+
+To **exclude** WireGuard from alerts, add its port to standard UDP ports:
+
+```json
+{
+  "standard_ports_udp": [53, 123, 67, 68, 51820, 14996],
+  "anomalous_patterns": ["ssh", "telnet", "udp"]
+}
+```
+
+This example adds WireGuard ports 51820 (default) and 14996 (custom) to the standard ports list.
 
 ## How It Works
 
