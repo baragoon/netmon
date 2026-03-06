@@ -478,7 +478,7 @@ func TestAnalyzeConnection_PrivateIPPattern(t *testing.T) {
 		{"Private 10.x.x.x", "10.0.0.1", false},
 		{"Private 192.168.x.x", "192.168.1.1", false},
 		{"Private 172.16.x.x", "172.16.0.1", false},
-		{"Public IP", "8.8.8.8", false}, // Not a private IP
+		{"Public IP", "8.8.8.8", false},  // Not a private IP
 		{"Loopback", "127.0.0.1", false}, // Loopback is also excluded
 	}
 
@@ -689,7 +689,7 @@ func TestAnalyzeConnection_SYN_SENT(t *testing.T) {
 	}{
 		{"SYN_SENT to port 22", 22, true},
 		{"SYN_SENT to port 8080", 8080, true},
-		{"SYN_SENT to port 80", 80, false}, // HTTP is excluded
+		{"SYN_SENT to port 80", 80, false},   // HTTP is excluded
 		{"SYN_SENT to port 443", 443, false}, // HTTPS is excluded
 	}
 
@@ -959,5 +959,46 @@ func TestAnalyzeConnection_MultipleReasons(t *testing.T) {
 		if !found {
 			t.Errorf("Expected reason %q in %v", expected, conn.AnomalousReasons)
 		}
+	}
+}
+
+// TestDedupeKeyIncludesProtocol validates that the LISTEN dedupe key uses protocol+port,
+// so a UDP entry on a port does not suppress a TCP LISTEN alert on the same port.
+func TestDedupeKeyIncludesProtocol(t *testing.T) {
+	// Both TCP LISTEN and UDP bound on the same non-standard port should
+	// independently produce LISTEN alerts from analyzeConnection.
+	const sharedPort = 8888
+
+	config := DefaultConfig()
+	logger := log.New(os.Stdout, "[test] ", log.LstdFlags)
+	monitor, err := NewConnectionMonitor(config, logger)
+	if err != nil {
+		t.Fatalf("Failed to create monitor: %v", err)
+	}
+
+	// Simulate a UDP bound socket on the shared port (seen first in the connection list).
+	udpConn := &Connection{
+		ProcessName: "app",
+		Protocol:    "udp",
+		LocalPort:   sharedPort,
+		RemotePort:  0,
+		RemoteIP:    "",
+		State:       "NONE",
+	}
+	monitor.analyzeConnection(udpConn)
+	if !udpConn.IsAnomalous {
+		t.Errorf("UDP bound socket on port %d should be flagged as anomalous", sharedPort)
+	}
+
+	// Simulate a TCP LISTEN on the same port (would be seen second in the connection list).
+	tcpConn := &Connection{
+		ProcessName: "app",
+		Protocol:    "tcp",
+		LocalPort:   sharedPort,
+		State:       "LISTEN",
+	}
+	monitor.analyzeConnection(tcpConn)
+	if !tcpConn.IsAnomalous {
+		t.Errorf("TCP LISTEN on port %d should be flagged as anomalous regardless of prior UDP entry on same port", sharedPort)
 	}
 }
