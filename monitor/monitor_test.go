@@ -241,6 +241,7 @@ func TestAnalyzeConnection_TCPStandardPorts(t *testing.T) {
 // TestAnalyzeConnection_ListenPorts tests LISTEN port detection with separate TCP/UDP standard ports
 func TestAnalyzeConnection_ListenPorts(t *testing.T) {
 	config := DefaultConfig()
+	config.AnomalousPatterns["udp"] = true // Enable UDP pattern detection for UDP listening ports
 	logger := log.New(os.Stdout, "[test] ", log.LstdFlags)
 	monitor, err := NewConnectionMonitor(config, logger)
 	if err != nil {
