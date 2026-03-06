@@ -84,20 +84,21 @@ func (m *ConnectionMonitor) checkConnections() {
 		return
 	}
 
-	// Deduplicate LISTEN connections: track seen local ports to avoid reporting IPv4 and IPv6 separately
-	seenListenPorts := make(map[int]bool)
+	// Deduplicate LISTEN connections: track seen protocol+port pairs to avoid reporting IPv4 and IPv6 separately
+	seenListenPorts := make(map[string]bool)
 
 	// Check for new or changed connections
 	currentKeys := make(map[string]bool)
 	for _, conn := range connections {
-		// Skip duplicate LISTEN on same port for IPv4/IPv6
+		// Skip duplicate LISTEN on same protocol+port for IPv4/IPv6
 		// Report only the first one seen (typically IPv4)
 		if isSocketListening(conn) && conn.LocalPort > 0 {
-			if seenListenPorts[conn.LocalPort] {
-				// Already reported this LISTEN port, skip the duplicate (IPv6 variant)
+			listenKey := fmt.Sprintf("%s:%d", conn.Protocol, conn.LocalPort)
+			if seenListenPorts[listenKey] {
+				// Already reported this LISTEN protocol+port, skip the duplicate (IPv6 variant)
 				continue
 			}
-			seenListenPorts[conn.LocalPort] = true
+			seenListenPorts[listenKey] = true
 		}
 
 		key := conn.connectionKey()
